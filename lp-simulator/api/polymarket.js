@@ -4,50 +4,83 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    // The weekly ETH price markets use the /markets endpoint with specific search
-    // From screenshot: "What price will Ethereum hit March 2-8?"
-    // These are individual markets with strikes like "↑ 2,200"
-    
+    // Known slugs for ETH price markets (weekly refreshes each week)
+    // We fetch by tag and filter — this way it auto-updates each week
     const r = await fetch(
-      "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100&order=volume&ascending=false&tag_slug=crypto",
-      { headers: { "Accept": "application/json" } }
-    );
-    
-    const data = r.ok ? await r.json() : [];
-    const arr = Array.isArray(data) ? data : [];
-
-    // Find ETH price markets — they have questions like "↑ 2,700" and share an eventId
-    const ethPriceMarkets = arr.filter(m => {
-      const q = (m.question || "").toLowerCase();
-      const slug = (m.slug || "").toLowerCase();
-      return (slug.includes("ethereum") || slug.includes("eth")) &&
-             (slug.includes("price") || slug.includes("hit") || q.match(/↑|↓/) || q.match(/\$[\d,]+/));
-    });
-
-    // Also try searching by the event slug pattern from screenshot
-    const eventSlugR = await fetch(
       "https://gamma-api.polymarket.com/events?active=true&closed=false&limit=100&order=volume&ascending=false&tag_slug=crypto",
       { headers: { "Accept": "application/json" } }
     );
-    const eventData = eventSlugR.ok ? await eventSlugR.json() : [];
-    const eventArr = Array.isArray(eventData) ? eventData : [];
-    
-    const ethEvents = eventArr.filter(e => {
-      const t = (e.title || e.slug || "").toLowerCase();
-      return (t.includes("eth") || t.includes("ether")) &&
-             (t.includes("price") || t.includes("hit") || t.includes("what price"));
+    const eventArr = r.ok ? await r.json() : [];
+
+    const ETH_KEYWORDS = ["what price will ethereum", "what price will eth"];
+
+    const ethEvents = (Array.isArray(eventArr) ? eventArr : []).filter(e => {
+      const t = (e.title || "").toLowerCase();
+      return ETH_KEYWORDS.some(k => t.includes(k));
     });
 
-    const debug = {
-      markets_total: arr.length,
-      eth_price_markets: ethPriceMarkets.map(m => ({ q: m.question, slug: m.slug, price: m.outcomePrices })),
-      events_total: eventArr.length,
-      eth_events: ethEvents.map(e => ({ title: e.title, slug: e.slug, markets: (e.markets||[]).length })),
-    };
+    const result = [];
 
-    res.status(200).json({ success: false, markets: [], debug, fetchedAt: new Date().toISOString() });
+    for (const event of ethEvents) {
+      const markets = event.markets || [];
+      const outcomes = [];
+
+      for (const m of markets) {
+        // groupItemTitle has the strike like "↑ 2,200" or "2200"
+        const q = m.groupItemTitle || m.question || "";
+        
+        // outcomePrices is JSON string e.g. '["0.19", "0.81"]'
+        let prices = [];
+        try { prices = JSON.parse(m.outcomePrices || "[]"); } catch {}
+        
+        // First price is "Yes" probability
+        const odd = parseFloat(prices[0] || 0);
+        if (odd <= 0.005 || odd >= 0.995) continue;
+
+        // Extract strike number
+        const priceMatch = q.replace(/,/g, "").match(/[\d]+/);
+        if (!priceMatch) continue;
+        const strike = parseFloat(priceMatch[0]);
+        if (isNaN(strike) || strike < 500 || strike > 20000) continue;
+
+        const isUp = q.includes("↑") || (!q.includes("↓") && !q.toLowerCase().includes("below") && !q.toLowerCase().includes("dip") && !q.toLowerCase().includes("under"));
+
+        outcomes.push({
+          outcome: q,
+          strike,
+          odd,
+          oddPct: (odd * 100).toFixed(1),
+          payoffPer100: (100 / odd).toFixed(0),
+          isUp,
+          volume: parseFloat(m.volume || 0),
+        });
+      }
+
+      const upOutcomes = outcomes
+        .filter(o => o.isUp)
+        .sort((a, b) => a.strike - b.strike);
+
+      if (upOutcomes.length > 0) {
+        result.push({
+          id: event.id,
+          question: event.title,
+          endDate: event.endDate,
+          volume: event.volume,
+          outcomes: upOutcomes,
+        });
+      }
+    }
+
+    // Sort: weekly first, then monthly, then yearly
+    result.sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
+
+    res.status(200).json({
+      success: result.length > 0,
+      markets: result.slice(0, 3),
+      fetchedAt: new Date().toISOString(),
+    });
 
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message, markets: [] });
   }
 }
