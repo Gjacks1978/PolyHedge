@@ -118,15 +118,16 @@ function Stat({ label, value, color, small }) {
 function TabPut() {
   const [ethPrice, setEthPrice] = useState(2000);
   const [capital, setCapital] = useState(4000);
-  const [rangePct, setRangePct] = useState(10);
+  const [rangeLo, setRangeLo] = useState(10);
+  const [rangeHi, setRangeHi] = useState(10);
   const [apr, setApr] = useState(100);
   const [strike, setStrike] = useState(1800);
   const [contracts, setContracts] = useState(1);
   const [expiry, setExpiry] = useState(45);
   const [iv] = useState(0.85);
 
-  const Plo = ethPrice * (1 - rangePct / 100);
-  const Phi = ethPrice * (1 + rangePct / 100);
+  const Plo = ethPrice * (1 - rangeLo / 100);
+  const Phi = ethPrice * (1 + rangeHi / 100);
   const feesDay = capital * (apr / 100) / 365;
   const premium = useMemo(() => bsPut(ethPrice, strike, expiry, iv) * contracts, [ethPrice, strike, expiry, iv, contracts]);
   const premiumPct = (premium / capital * 100).toFixed(2);
@@ -152,17 +153,19 @@ function TabPut() {
       {/* Pool inputs */}
       <div className="card">
         <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA POOL</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
           <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-          <Field label="RANGE (CADA LADO)" value={rangePct} onChange={setRangePct} suffix="%" min={1} max={50} step={0.5} />
+          <Field label="RANGE INFERIOR" value={rangeLo} onChange={setRangeLo} suffix="%" min={1} max={50} step={0.5} />
+          <Field label="RANGE SUPERIOR" value={rangeHi} onChange={setRangeHi} suffix="%" min={1} max={50} step={0.5} />
           <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 14 }}>
           <Stat label="LIMITE INFERIOR" value={`$${Plo.toFixed(0)}`} color={S.red} small />
+          <Stat label="RANGE ↓" value={`${rangeLo}%`} color={S.red} small />
           <Stat label="ENTRADA ETH" value={`$${ethPrice}`} color={S.gold} small />
+          <Stat label="RANGE ↑" value={`${rangeHi}%`} color={S.green} small />
           <Stat label="LIMITE SUPERIOR" value={`$${Phi.toFixed(0)}`} color={S.green} small />
-          <Stat label="FEES / DIA" value={`$${feesDay.toFixed(1)}`} color={S.blue} small />
         </div>
       </div>
 
@@ -283,7 +286,8 @@ function TabPut() {
 function TabPolymarket() {
   const [ethPrice, setEthPrice] = useState(2000);
   const [capital, setCapital] = useState(4000);
-  const [rangePct, setRangePct] = useState(10);
+  const [rangeLo, setRangeLo] = useState(10);
+  const [rangeHi, setRangeHi] = useState(10);
   const [apr, setApr] = useState(100);
   const [stopPct, setStopPct] = useState(2);
   const [betOdd, setBetOdd] = useState(0.15);
@@ -292,8 +296,8 @@ function TabPolymarket() {
   const [waitDays, setWaitDays] = useState(2);
   const [ethMoveWait, setEthMoveWait] = useState(1.5);
 
-  const Plo = ethPrice * (1 - rangePct / 100);
-  const Phi = ethPrice * (1 + rangePct / 100);
+  const Plo = ethPrice * (1 - rangeLo / 100);
+  const Phi = ethPrice * (1 + rangeHi / 100);
   const feesDay = capital * (apr / 100) / 365;
   const stop = capital * stopPct / 100;
   const winPayoff = betAmount / betOdd;
@@ -304,7 +308,7 @@ function TabPolymarket() {
   // Price move INCREASES odd, time decay DECREASES odd — independent and multiplicative
   const oddAfterWait = useMemo(() => {
     // Price boost: ETH closer to strike = higher probability
-    const distanceCovered = Math.min(1, ethMoveWait / rangePct);
+    const distanceCovered = Math.min(1, ethMoveWait / rangeHi);
     const priceBoostMultiplier = 1 + distanceCovered * 3;
     const oddAfterPriceMove = betOdd * priceBoostMultiplier;
     // Time decay: less days remaining = lower probability
@@ -312,7 +316,7 @@ function TabPolymarket() {
     const remainingDays = Math.max(0, totalDays - waitDays);
     const timeFactor = totalDays > 0 ? remainingDays / totalDays : 0;
     return Math.min(0.95, oddAfterPriceMove * timeFactor);
-  }, [betOdd, entryDay, waitDays, ethMoveWait, rangePct]);
+  }, [betOdd, entryDay, waitDays, ethMoveWait, rangeHi]);
 
   const winPayoffAfterWait = betAmount / oddAfterWait;
 
@@ -337,7 +341,7 @@ function TabPolymarket() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-      <PolymarketLive ethPrice={ethPrice} rangePct={rangePct} />
+      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} />
 
       {/* Pool + aposta inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -346,7 +350,8 @@ function TabPolymarket() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
             <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-            <Field label="RANGE (CADA LADO)" value={rangePct} onChange={setRangePct} suffix="%" min={1} max={50} step={0.5} />
+            <Field label="RANGE INFERIOR ↓" value={rangeLo} onChange={setRangeLo} suffix="%" min={1} max={50} step={0.5} />
+            <Field label="RANGE SUPERIOR ↑" value={rangeHi} onChange={setRangeHi} suffix="%" min={1} max={50} step={0.5} />
             <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
@@ -366,15 +371,23 @@ function TabPolymarket() {
           <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA APOSTA</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <div className="label" style={{ marginBottom: 8 }}>ODD DE ENTRADA</div>
-              <div style={{ display: "flex", flexWrap: "wrap" }}>
-                {[0.05, 0.10, 0.15, 0.20, 0.25, 0.30].map(o => (
-                  <span key={o} className="pill"
-                    style={{ background: betOdd === o ? S.gold : S.border, color: betOdd === o ? "#000" : S.textDim, fontWeight: betOdd === o ? 600 : 400 }}
-                    onClick={() => setBetOdd(o)}>
-                    {(o * 100).toFixed(0)}%
-                  </span>
-                ))}
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span className="label">ODD DE ENTRADA</span>
+                <span style={{ color: S.gold, fontSize: 14, fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>
+                  {(betOdd * 100).toFixed(0)}% → paga {(1/betOdd).toFixed(1)}x
+                </span>
+              </div>
+              <input type="range" min={3} max={50} step={1}
+                value={Math.round(betOdd * 100)}
+                onChange={e => setBetOdd(+e.target.value / 100)} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, marginTop: 3, fontFamily: "'JetBrains Mono'" }}>
+                <span>3% (33x)</span><span>15%</span><span>25%</span><span>50% (2x)</span>
+              </div>
+              <div style={{ height: 4, borderRadius: 2, marginTop: 6,
+                background: `linear-gradient(to right, ${S.green} ${(betOdd*100-3)/47*100}%, ${betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red} ${(betOdd*100-3)/47*100}%, transparent)`,
+                border: `1px solid ${S.border}` }} />
+              <div style={{ fontSize: 10, color: betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red, marginTop: 4, fontFamily: "'JetBrains Mono'" }}>
+                {betOdd<=0.10 ? "✓ Assimetria máxima" : betOdd<=0.20 ? "✓ Zona ideal de hedge" : betOdd<=0.35 ? "⚠ Odd moderada" : "✗ Pouca assimetria"}
               </div>
             </div>
             <div>
@@ -685,6 +698,8 @@ function TabScenarios() {
   const [capital, setCapital] = useState(4000);
   const [apr, setApr] = useState(100);
   const [stopPct, setStopPct] = useState(2);
+  const [rangeLo3, setRangeLo3] = useState(10);
+  const [rangeHi3, setRangeHi3] = useState(10);
   const [activeIdx, setActiveIdx] = useState(null);
   const paths = useMemo(() => SCENARIO_META.map((_, i) => generatePath(i)), []);
   const results = useMemo(() => paths.map(p => calcScenario(p, betOdd, betAmount, capital, apr, stopPct)), [paths, betOdd, betAmount, capital, apr, stopPct]);
@@ -700,16 +715,13 @@ function TabScenarios() {
           <Field label="APR" value={apr} onChange={setApr} suffix="%" min={10} max={500} step={5} />
           <Field label="STOP %" value={stopPct} onChange={setStopPct} suffix="%" min={0.5} max={5} step={0.1} />
           <div>
-            <div className="label" style={{ marginBottom: 8 }}>ODD APOSTA</div>
-            <div style={{ display: "flex", flexWrap: "wrap" }}>
-              {[0.10, 0.15, 0.20, 0.25].map(o => (
-                <span key={o} className="pill"
-                  style={{ background: betOdd === o ? S.gold : S.border, color: betOdd === o ? "#000" : S.textDim }}
-                  onClick={() => setBetOdd(o)}>
-                  {(o * 100).toFixed(0)}%
-                </span>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">ODD APOSTA</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>{(betOdd*100).toFixed(0)}%</span>
             </div>
+            <input type="range" min={3} max={50} step={1}
+              value={Math.round(betOdd*100)}
+              onChange={e => setBetOdd(+e.target.value/100)} />
           </div>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
