@@ -156,8 +156,28 @@ function TabPut() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
           <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-          <Field label="RANGE INFERIOR" value={rangeLo} onChange={setRangeLo} suffix="%" min={1} max={50} step={0.5} />
-          <Field label="RANGE SUPERIOR" value={rangeHi} onChange={setRangeHi} suffix="%" min={1} max={50} step={0.5} />
+          <div>
+            <div className="label">RANGE INFERIOR</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="number" value={rangeLo} min={1} max={50} step={0.5}
+                onChange={e => setRangeLo(+e.target.value)} style={{ flex: 1 }} />
+              <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+            </div>
+            <div style={{ fontSize: 10, color: S.red, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              → ${(ethPrice * (1 - rangeLo / 100)).toFixed(0)}
+            </div>
+          </div>
+          <div>
+            <div className="label">RANGE SUPERIOR</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="number" value={rangeHi} min={1} max={50} step={0.5}
+                onChange={e => setRangeHi(+e.target.value)} style={{ flex: 1 }} />
+              <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+            </div>
+            <div style={{ fontSize: 10, color: S.green, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              → ${(ethPrice * (1 + rangeHi / 100)).toFixed(0)}
+            </div>
+          </div>
           <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 14 }}>
@@ -350,8 +370,28 @@ function TabPolymarket() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
             <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-            <Field label="RANGE INFERIOR ↓" value={rangeLo} onChange={setRangeLo} suffix="%" min={1} max={50} step={0.5} />
-            <Field label="RANGE SUPERIOR ↑" value={rangeHi} onChange={setRangeHi} suffix="%" min={1} max={50} step={0.5} />
+            <div>
+              <div className="label">RANGE INFERIOR ↓</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="number" value={rangeLo} min={1} max={50} step={0.5}
+                  onChange={e => setRangeLo(+e.target.value)} style={{ flex: 1 }} />
+                <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+              </div>
+              <div style={{ fontSize: 10, color: S.red, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+                → ${(ethPrice * (1 - rangeLo / 100)).toFixed(0)}
+              </div>
+            </div>
+            <div>
+              <div className="label">RANGE SUPERIOR ↑</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="number" value={rangeHi} min={1} max={50} step={0.5}
+                  onChange={e => setRangeHi(+e.target.value)} style={{ flex: 1 }} />
+                <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+              </div>
+              <div style={{ fontSize: 10, color: S.green, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+                → ${(ethPrice * (1 + rangeHi / 100)).toFixed(0)}
+              </div>
+            </div>
             <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
@@ -442,7 +482,7 @@ function TabPolymarket() {
               <span className="label">MOVIMENTO ETH NO PERÍODO</span>
               <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>+{ethMoveWait}%</span>
             </div>
-            <input type="range" min={0} max={rangePct} step={0.5} value={ethMoveWait} onChange={e => setEthMoveWait(+e.target.value)} />
+            <input type="range" min={0} max={rangeHi} step={0.5} value={ethMoveWait} onChange={e => setEthMoveWait(+e.target.value)} />
             <div style={{ fontSize: 11, color: S.textDim, marginTop: 6, fontFamily: "'JetBrains Mono'" }}>
               Alta observada antes de apostar
             </div>
