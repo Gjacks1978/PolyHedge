@@ -836,9 +836,15 @@ function PolymarketLive({ ethPrice, rangePct }) {
   }, []);
 
   const allOutcomes = markets.flatMap(m => m.outcomes || []);
+  // Best hedge: strike above current price, odd between 5%-50% (useful asymmetry)
   const bestMatch = allOutcomes
-    .filter(o => o.strike >= upperLimit * 0.95 && o.strike <= upperLimit * 1.1)
-    .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0];
+    .filter(o => o.strike >= upperLimit * 0.95 && o.strike <= upperLimit * 1.5)
+    .filter(o => parseFloat(o.odd) >= 0.05 && parseFloat(o.odd) <= 0.50)
+    .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0]
+    || allOutcomes
+    .filter(o => o.strike >= upperLimit * 0.95)
+    .filter(o => parseFloat(o.odd) < 0.50)
+    .sort((a, b) => a.strike - b.strike)[0];
 
   return (
     <div className="card" style={{ borderColor: S.green + "40", marginBottom: 16 }}>
@@ -880,7 +886,7 @@ function PolymarketLive({ ethPrice, rangePct }) {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {(market.outcomes || []).map((o, i) => {
-              const isTarget = Math.abs(o.strike - upperLimit) / upperLimit < 0.05;
+              const isTarget = bestMatch && o.strike === bestMatch.strike && parseFloat(o.odd) <= 0.50;
               return (
                 <div key={i} style={{
                   padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
@@ -910,7 +916,9 @@ function PolymarketLive({ ethPrice, rangePct }) {
           <strong style={{ color: S.gold }}>${bestMatch.strike.toLocaleString()}</strong> — odd{" "}
           <strong style={{ color: S.gold }}>{bestMatch.oddPct}%</strong> — apostar $20 recebe{" "}
           <strong style={{ color: S.green }}>${(20 / parseFloat(bestMatch.odd)).toFixed(0)}</strong>.
-          {parseFloat(bestMatch.odd) <= 0.25 ? " ✓ Custo razoável." : " ⚠ Odd alta — avalie o payoff."}
+          {parseFloat(bestMatch.odd) <= 0.15 ? " ✓ Odd ideal para hedge — boa assimetria." :
+            parseFloat(bestMatch.odd) <= 0.30 ? " ✓ Custo razoável — payoff ainda compensa." :
+            " ⚠ Odd moderada — verifique se o payoff cobre seu stop."}
         </div>
       )}
     </div>
