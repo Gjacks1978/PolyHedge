@@ -53,37 +53,37 @@ const S = {
 };
 
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=Inter:wght@400;500;600&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:${S.bg};}
   input[type=range]{accent-color:${S.gold};width:100%;cursor:pointer;height:4px;}
   input[type=number]{background:#0a0a18;border:1px solid ${S.border};color:${S.text};
-    font-family:'JetBrains Mono',monospace;font-size:14px;padding:8px 10px;border-radius:6px;width:100%;
+    font-family:'IBM Plex Mono',monospace;font-size:14px;padding:8px 10px;border-radius:6px;width:100%;
     outline:none;transition:border-color 0.2s;}
   input[type=number]:focus{border-color:${S.gold};}
   input[type=number]::-webkit-inner-spin-button{opacity:0.4;}
   .card{background:${S.surface};border:1px solid ${S.border};border-radius:10px;padding:18px;}
-  .tab{cursor:pointer;padding:10px 20px;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;
+  .tab{cursor:pointer;padding:10px 20px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
     border-radius:8px;transition:all 0.2s;letter-spacing:0.5px;}
   .tab.active{background:${S.gold};color:#000;}
   .tab.inactive{color:${S.textDim};background:transparent;}
   .tab.inactive:hover{color:${S.text};background:${S.border};}
   table{width:100%;border-collapse:collapse;}
   th{color:${S.dim};font-size:10px;text-align:right;padding:6px 8px;
-    border-bottom:1px solid ${S.border};font-family:'JetBrains Mono',monospace;letter-spacing:1px;}
+    border-bottom:1px solid ${S.border};font-family:'IBM Plex Mono',monospace;letter-spacing:1px;}
   th:first-child{text-align:left;}
-  td{font-size:12px;font-family:'JetBrains Mono',monospace;text-align:right;
+  td{font-size:13px;font-family:'IBM Plex Mono',monospace;text-align:right;
     padding:7px 8px;border-bottom:1px solid #0a0a15;}
   td:first-child{text-align:left;color:${S.textDim};}
   tr:hover td{background:#0f0f1e;}
-  .label{font-size:10px;color:${S.textDim};letter-spacing:1.5px;font-family:'JetBrains Mono',monospace;margin-bottom:6px;}
-  .value{font-size:22px;font-family:'Syne',sans-serif;font-weight:700;}
+  .label{font-size:10px;color:${S.textDim};letter-spacing:1px;font-family:'IBM Plex Mono',monospace;margin-bottom:6px;}
+  .value{font-size:22px;font-family:'Space Grotesk',sans-serif;font-weight:700;}
   .pill{display:inline-block;padding:5px 14px;border-radius:20px;font-size:11px;
-    cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all 0.15s;margin:2px;}
+    cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all 0.15s;margin:2px;}
   .sep{border-left:1px solid ${S.border};}
   .insight{padding:14px 16px;background:#090914;border-radius:8px;
-    border-left:3px solid ${S.gold};font-size:12px;color:${S.textDim};
-    font-family:'JetBrains Mono',monospace;line-height:1.8;margin-top:14px;}
+    border-left:3px solid ${S.gold};font-size:13px;color:${S.textDim};
+    font-family:'Inter',sans-serif;line-height:1.8;margin-top:14px;}
 `;
 
 // ─── INPUT FIELD ──────────────────────────────────────────────
@@ -92,11 +92,11 @@ function Field({ label, value, onChange, prefix = "", suffix = "", min, max, ste
     <div>
       <div className="label">{label}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {prefix && <span style={{ color: S.gold, fontFamily: "'JetBrains Mono'", fontSize: 14 }}>{prefix}</span>}
+        {prefix && <span style={{ color: S.gold, fontFamily: "'IBM Plex Mono'", fontSize: 14 }}>{prefix}</span>}
         <input type="number" value={value} min={min} max={max} step={step}
           onChange={e => onChange(+e.target.value)}
           style={{ flex: 1 }} />
-        {suffix && <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>{suffix}</span>}
+        {suffix && <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>{suffix}</span>}
       </div>
     </div>
   );
@@ -161,9 +161,9 @@ function TabPut() {
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input type="number" value={rangeLo} min={1} max={50} step={0.5}
                 onChange={e => setRangeLo(+e.target.value)} style={{ flex: 1 }} />
-              <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+              <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
             </div>
-            <div style={{ fontSize: 10, color: S.red, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: S.red, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
               → ${(ethPrice * (1 - rangeLo / 100)).toFixed(0)}
             </div>
           </div>
@@ -172,9 +172,9 @@ function TabPut() {
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input type="number" value={rangeHi} min={1} max={50} step={0.5}
                 onChange={e => setRangeHi(+e.target.value)} style={{ flex: 1 }} />
-              <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+              <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
             </div>
-            <div style={{ fontSize: 10, color: S.green, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: S.green, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
               → ${(ethPrice * (1 + rangeHi / 100)).toFixed(0)}
             </div>
           </div>
@@ -196,7 +196,7 @@ function TabPut() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">STRIKE</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'JetBrains Mono'" }}>${strike} ({((1 - strike / ethPrice) * 100).toFixed(1)}% abaixo)</span>
+              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>${strike} ({((1 - strike / ethPrice) * 100).toFixed(1)}% abaixo)</span>
             </div>
             <input type="range" min={ethPrice * 0.5} max={ethPrice} step={50}
               value={strike} onChange={e => setStrike(+e.target.value)} />
@@ -207,7 +207,7 @@ function TabPut() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">CONTRATOS</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'JetBrains Mono'" }}>{contracts} ETH</span>
+              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>{contracts} ETH</span>
             </div>
             <input type="range" min={0.5} max={5} step={0.5}
               value={contracts} onChange={e => setContracts(+e.target.value)} />
@@ -215,7 +215,7 @@ function TabPut() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">VENCIMENTO</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'JetBrains Mono'" }}>{expiry} dias</span>
+              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>{expiry} dias</span>
             </div>
             <input type="range" min={7} max={90} step={7}
               value={expiry} onChange={e => setExpiry(+e.target.value)} />
@@ -232,7 +232,7 @@ function TabPut() {
           <Stat label="BREAK-EVEN" value={`${breakEvenDays.toFixed(1)} dias`} color={S.blue} small />
           <div className="card" style={{ textAlign: "center" }}>
             <div className="label">TICKER DERIBIT</div>
-            <div style={{ fontSize: 12, color: S.purple, fontFamily: "'JetBrains Mono'", fontWeight: 500, marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: S.purple, fontFamily: "'IBM Plex Mono'", fontWeight: 500, marginTop: 4 }}>
               ETH-{expiry <= 30 ? "28MAR26" : expiry <= 60 ? "25APR26" : "27JUN26"}-{strike}-P
             </div>
           </div>
@@ -292,7 +292,7 @@ function TabPut() {
             ))}
           </tbody>
         </table>
-        <div style={{ fontSize: 10, color: S.dim, marginTop: 10, fontFamily: "'JetBrains Mono'" }}>
+        <div style={{ fontSize: 10, color: S.dim, marginTop: 10, fontFamily: "'IBM Plex Mono'" }}>
           * P&L da LP não inclui fees · Prêmio calculado via Black-Scholes IV {(iv * 100).toFixed(0)}%aa
         </div>
       </div>
@@ -375,9 +375,9 @@ function TabPolymarket() {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <input type="number" value={rangeLo} min={1} max={50} step={0.5}
                   onChange={e => setRangeLo(+e.target.value)} style={{ flex: 1 }} />
-                <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+                <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
               </div>
-              <div style={{ fontSize: 10, color: S.red, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: S.red, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
                 → ${(ethPrice * (1 - rangeLo / 100)).toFixed(0)}
               </div>
             </div>
@@ -386,9 +386,9 @@ function TabPolymarket() {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <input type="number" value={rangeHi} min={1} max={50} step={0.5}
                   onChange={e => setRangeHi(+e.target.value)} style={{ flex: 1 }} />
-                <span style={{ color: S.textDim, fontFamily: "'JetBrains Mono'", fontSize: 12 }}>%</span>
+                <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
               </div>
-              <div style={{ fontSize: 10, color: S.green, fontFamily: "'JetBrains Mono'", marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: S.green, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
                 → ${(ethPrice * (1 + rangeHi / 100)).toFixed(0)}
               </div>
             </div>
@@ -401,7 +401,7 @@ function TabPolymarket() {
           <div style={{ marginTop: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">STOP % NOS LIMITES</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>{stopPct}%</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{stopPct}%</span>
             </div>
             <input type="range" min={0.5} max={5} step={0.1} value={stopPct} onChange={e => setStopPct(+e.target.value)} />
           </div>
@@ -413,20 +413,20 @@ function TabPolymarket() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span className="label">ODD DE ENTRADA</span>
-                <span style={{ color: S.gold, fontSize: 14, fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>
+                <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'", fontWeight: 600 }}>
                   {(betOdd * 100).toFixed(0)}% → paga {(1/betOdd).toFixed(1)}x
                 </span>
               </div>
               <input type="range" min={3} max={50} step={1}
                 value={Math.round(betOdd * 100)}
                 onChange={e => setBetOdd(+e.target.value / 100)} />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, marginTop: 3, fontFamily: "'JetBrains Mono'" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, marginTop: 3, fontFamily: "'IBM Plex Mono'" }}>
                 <span>3% (33x)</span><span>15%</span><span>25%</span><span>50% (2x)</span>
               </div>
               <div style={{ height: 4, borderRadius: 2, marginTop: 6,
                 background: `linear-gradient(to right, ${S.green} ${(betOdd*100-3)/47*100}%, ${betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red} ${(betOdd*100-3)/47*100}%, transparent)`,
                 border: `1px solid ${S.border}` }} />
-              <div style={{ fontSize: 10, color: betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red, marginTop: 4, fontFamily: "'JetBrains Mono'" }}>
+              <div style={{ fontSize: 10, color: betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>
                 {betOdd<=0.10 ? "✓ Assimetria máxima" : betOdd<=0.20 ? "✓ Zona ideal de hedge" : betOdd<=0.35 ? "⚠ Odd moderada" : "✗ Pouca assimetria"}
               </div>
             </div>
@@ -446,10 +446,10 @@ function TabPolymarket() {
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">VALOR APOSTADO</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>${betAmount} → recebe ${winPayoff.toFixed(0)}</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>${betAmount} → recebe ${winPayoff.toFixed(0)}</span>
             </div>
             <input type="range" min={5} max={stop} step={5} value={betAmount} onChange={e => setBetAmount(+e.target.value)} />
-            <div style={{ fontSize: 10, color: S.dim, marginTop: 4, fontFamily: "'JetBrains Mono'" }}>
+            <div style={{ fontSize: 10, color: S.dim, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>
               = {(betAmount / feesDay).toFixed(1)} dias de fees · retorno {(winPayoff / betAmount).toFixed(1)}x
             </div>
           </div>
@@ -470,20 +470,20 @@ function TabPolymarket() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">DIAS DE ESPERA</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>{waitDays} dias</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{waitDays} dias</span>
             </div>
             <input type="range" min={0} max={4} step={1} value={waitDays} onChange={e => setWaitDays(+e.target.value)} />
-            <div style={{ fontSize: 11, color: S.textDim, marginTop: 6, fontFamily: "'JetBrains Mono'" }}>
+            <div style={{ fontSize: 11, color: S.textDim, marginTop: 6, fontFamily: "'IBM Plex Mono'" }}>
               Observa o mercado antes de apostar
             </div>
           </div>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">MOVIMENTO ETH NO PERÍODO</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>+{ethMoveWait}%</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>+{ethMoveWait}%</span>
             </div>
             <input type="range" min={0} max={rangeHi} step={0.5} value={ethMoveWait} onChange={e => setEthMoveWait(+e.target.value)} />
-            <div style={{ fontSize: 11, color: S.textDim, marginTop: 6, fontFamily: "'JetBrains Mono'" }}>
+            <div style={{ fontSize: 11, color: S.textDim, marginTop: 6, fontFamily: "'IBM Plex Mono'" }}>
               Alta observada antes de apostar
             </div>
           </div>
@@ -495,7 +495,7 @@ function TabPolymarket() {
           <Stat label="PAYOFF APÓS ESPERA" value={`$${winPayoffAfterWait.toFixed(0)}`} color={winPayoffAfterWait >= winPayoff ? S.green : S.gold} small />
           <div className="card" style={{ textAlign: "center", background: "#090914" }}>
             <div className="label">VEREDICTO</div>
-            <div style={{ fontSize: 12, color: ethMoveWait >= 2 && waitDays <= 2 ? S.green : ethMoveWait >= 1 && waitDays <= 3 ? S.gold : ethMoveWait === 0 && waitDays >= 2 ? S.red : S.gold, marginTop: 4, fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>
+            <div style={{ fontSize: 12, color: ethMoveWait >= 2 && waitDays <= 2 ? S.green : ethMoveWait >= 1 && waitDays <= 3 ? S.gold : ethMoveWait === 0 && waitDays >= 2 ? S.red : S.gold, marginTop: 4, fontFamily: "'IBM Plex Mono'", fontWeight: 600 }}>
               {waitDays === 0 ? "Sem confirmação" :
                 ethMoveWait >= 2 && waitDays <= 2 ? "✓ Timing ótimo" :
                 ethMoveWait >= 1 && waitDays <= 3 ? "✓ Ainda razoável" :
@@ -538,20 +538,20 @@ function TabPolymarket() {
                     transition: "height 0.3s"
                   }} />
                 </div>
-                <div style={{ fontSize: 11, color: isEntry ? S.gold : isPast ? S.dim : S.textDim, marginBottom: 3, fontFamily: "'JetBrains Mono'" }}>
+                <div style={{ fontSize: 11, color: isEntry ? S.gold : isPast ? S.dim : S.textDim, marginBottom: 3, fontFamily: "'IBM Plex Mono'" }}>
                   {DAY_LABELS[day - 1]}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isPast ? S.dim : col(value - betAmount), fontFamily: "'JetBrains Mono'" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isPast ? S.dim : col(value - betAmount), fontFamily: "'IBM Plex Mono'" }}>
                   {isPast ? "—" : `$${value?.toFixed(0)}`}
                 </div>
-                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'JetBrains Mono'" }}>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
                   {isPast ? "" : `${pct?.toFixed(0)}%`}
                 </div>
               </div>
             );
           })}
         </div>
-        <div style={{ fontSize: 10, color: S.dim, marginTop: 8, fontFamily: "'JetBrains Mono'" }}>
+        <div style={{ fontSize: 10, color: S.dim, marginTop: 8, fontFamily: "'IBM Plex Mono'" }}>
           Valor de revenda no mercado secundário · % do custo original recuperável
         </div>
       </div>
@@ -601,8 +601,8 @@ function TabPolymarket() {
           ].map(item => (
             <div key={item.label} style={{ textAlign: "center", padding: "16px", background: "#090914", borderRadius: 8, border: `1px solid ${item.color}20` }}>
               <div className="label">{item.label}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: item.color, fontFamily: "'Syne'", marginTop: 6 }}>{item.value}</div>
-              <div style={{ fontSize: 11, color: S.textDim, marginTop: 4, fontFamily: "'JetBrains Mono'" }}>{item.sub}</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: item.color, fontFamily: "'Space Grotesk'", marginTop: 6 }}>{item.value}</div>
+              <div style={{ fontSize: 11, color: S.textDim, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>{item.sub}</div>
             </div>
           ))}
         </div>
@@ -672,7 +672,7 @@ function MiniChart({ path, color, exitIdx, exitType }) {
       ctx.strokeStyle = c + "50"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(pad.l, yS(p)); ctx.lineTo(pad.l + cW, yS(p)); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = c + "80"; ctx.font = "9px JetBrains Mono"; ctx.textAlign = "right";
+      ctx.fillStyle = c + "80"; ctx.font = "9px IBM Plex Mono"; ctx.textAlign = "right";
       ctx.fillText(`$${p}`, pad.l - 2, yS(p) + 3);
     });
     // week markers
@@ -702,7 +702,7 @@ function MiniChart({ path, color, exitIdx, exitType }) {
       ctx.fillStyle = exitType === "upper" ? "#3dd68c" : "#f06060"; ctx.fill();
     }
     // day labels
-    ctx.fillStyle = "#333"; ctx.font = "8px JetBrains Mono"; ctx.textAlign = "center";
+    ctx.fillStyle = "#333"; ctx.font = "8px IBM Plex Mono"; ctx.textAlign = "center";
     for (let d = 0; d < path.length; d += 7) ctx.fillText(`d${d}`, xS(d), H - 4);
   }, [path, color, exitIdx, exitType]);
   return <canvas ref={canvasRef} width={380} height={160} style={{ width: "100%", height: 160, borderRadius: 6 }} />;
@@ -757,7 +757,7 @@ function TabScenarios() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">ODD APOSTA</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'JetBrains Mono'" }}>{(betOdd*100).toFixed(0)}%</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{(betOdd*100).toFixed(0)}%</span>
             </div>
             <input type="range" min={3} max={50} step={1}
               value={Math.round(betOdd*100)}
@@ -766,7 +766,7 @@ function TabScenarios() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">APOSTA/SEM</span>
-              <span style={{ color: S.gold, fontSize: 12, fontFamily: "'JetBrains Mono'" }}>${betAmount}</span>
+              <span style={{ color: S.gold, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>${betAmount}</span>
             </div>
             <input type="range" min={5} max={80} step={5} value={betAmount} onChange={e => setBetAmount(+e.target.value)} />
           </div>
@@ -783,11 +783,11 @@ function TabScenarios() {
               onClick={() => setActiveIdx(isActive ? null : idx)}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: sc.color, letterSpacing: 2, fontFamily: "'JetBrains Mono'" }}>{sc.title.toUpperCase()}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Syne'", marginTop: 2 }}>{sc.subtitle}</div>
+                  <div style={{ fontSize: 10, color: sc.color, letterSpacing: 2, fontFamily: "'IBM Plex Mono'" }}>{sc.title.toUpperCase()}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Space Grotesk'", marginTop: 2 }}>{sc.subtitle}</div>
                 </div>
                 <div style={{
-                  fontSize: 16, fontWeight: 800, fontFamily: "'Syne'",
+                  fontSize: 16, fontWeight: 800, fontFamily: "'Space Grotesk'",
                   color: r.netPnL >= 0 ? S.green : S.red,
                   background: r.netPnL >= 0 ? S.green + "15" : S.red + "15",
                   padding: "4px 12px", borderRadius: 20
@@ -806,8 +806,8 @@ function TabScenarios() {
                   { label: "SEM HEDGE", value: `${r.netWithout >= 0 ? "+" : ""}$${r.netWithout.toFixed(0)}`, c: col(r.netWithout) },
                 ].map(item => (
                   <div key={item.label} style={{ textAlign: "center", background: "#090914", borderRadius: 6, padding: "6px 4px" }}>
-                    <div style={{ fontSize: 9, color: S.dim, fontFamily: "'JetBrains Mono'" }}>{item.label}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: item.c || S.text, fontFamily: "'JetBrains Mono'", marginTop: 2 }}>{item.value}</div>
+                    <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>{item.label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: item.c || S.text, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>{item.value}</div>
                   </div>
                 ))}
               </div>
@@ -833,14 +833,14 @@ function TabScenarios() {
             const r = results[idx];
             return (
               <div key={idx} style={{ textAlign: "center", padding: "14px 8px", background: "#090914", borderRadius: 8 }}>
-                <div style={{ fontSize: 10, color: sc.color, fontFamily: "'JetBrains Mono'", marginBottom: 6 }}>{sc.title.toUpperCase()}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Syne'", color: r.netPnL >= 0 ? S.green : S.red }}>
+                <div style={{ fontSize: 10, color: sc.color, fontFamily: "'IBM Plex Mono'", marginBottom: 6 }}>{sc.title.toUpperCase()}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'Space Grotesk'", color: r.netPnL >= 0 ? S.green : S.red }}>
                   {r.netPnL >= 0 ? "+" : ""}${r.netPnL.toFixed(0)}
                 </div>
-                <div style={{ fontSize: 10, color: S.textDim, marginTop: 4, fontFamily: "'JetBrains Mono'" }}>
+                <div style={{ fontSize: 10, color: S.textDim, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>
                   sem hedge: {r.netWithout >= 0 ? "+" : ""}${r.netWithout.toFixed(0)}
                 </div>
-                <div style={{ fontSize: 11, marginTop: 4, fontFamily: "'JetBrains Mono'", color: col(r.netPnL - r.netWithout) }}>
+                <div style={{ fontSize: 11, marginTop: 4, fontFamily: "'IBM Plex Mono'", color: col(r.netPnL - r.netWithout) }}>
                   aposta: {fmtUSD(r.netPnL - r.netWithout)}
                 </div>
               </div>
@@ -903,26 +903,26 @@ function PolymarketLive({ ethPrice, rangePct }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div>
           <div className="label" style={{ color: S.green }}>POLYMARKET — ODDS AO VIVO</div>
-          {lastUpdate && <div style={{ fontSize: 10, color: S.dim, marginTop: 2, fontFamily: "'JetBrains Mono'" }}>
+          {lastUpdate && <div style={{ fontSize: 10, color: S.dim, marginTop: 2, fontFamily: "'IBM Plex Mono'" }}>
             Atualizado: {lastUpdate} · auto-refresh 60s
           </div>}
         </div>
         <button onClick={fetchMarkets} disabled={loading}
           style={{ background: S.border, border: "none", color: S.text, padding: "6px 14px",
-            borderRadius: 6, cursor: "pointer", fontFamily: "'JetBrains Mono'", fontSize: 11 }}>
+            borderRadius: 6, cursor: "pointer", fontFamily: "'IBM Plex Mono'", fontSize: 11 }}>
           {loading ? "carregando..." : "↻ atualizar"}
         </button>
       </div>
 
       {error && (
         <div style={{ padding: "10px 14px", background: S.red + "15", borderRadius: 6,
-          color: S.red, fontSize: 12, fontFamily: "'JetBrains Mono'" }}>
+          color: S.red, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
           {error}
         </div>
       )}
 
       {loading && !markets.length && (
-        <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'JetBrains Mono'" }}>
+        <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
           buscando mercados...
         </div>
       )}
@@ -930,7 +930,7 @@ function PolymarketLive({ ethPrice, rangePct }) {
       {markets.map(market => (
         <div key={market.id} style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, color: S.textDim, marginBottom: 8,
-            fontFamily: "'JetBrains Mono'", borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
+            fontFamily: "'IBM Plex Mono'", borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
             {market.question}
             <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
               Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
@@ -946,13 +946,13 @@ function PolymarketLive({ ethPrice, rangePct }) {
                   border: "1px solid " + (isTarget ? S.green : S.border),
                 }}>
                   <div style={{ fontSize: 10, color: isTarget ? S.green : S.dim,
-                    fontFamily: "'JetBrains Mono'", marginBottom: 3 }}>
+                    fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
                     {isTarget ? "★ " : ""}${o.strike.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: isTarget ? S.green : S.text, fontFamily: "'Syne'" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: isTarget ? S.green : S.text, fontFamily: "'Space Grotesk'" }}>
                     {o.oddPct}%
                   </div>
-                  <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'JetBrains Mono'", marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
                     paga ${o.payoffPer100}/$100
                   </div>
                 </div>
@@ -985,19 +985,19 @@ export default function App() {
   const tabs = ["Put como Seguro", "Aposta Polymarket", "4 Cenários"];
 
   return (
-    <div style={{ background: S.bg, minHeight: "100vh", color: S.text, fontFamily: "'JetBrains Mono', monospace" }}>
+    <div style={{ background: S.bg, minHeight: "100vh", color: S.text, fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
 
       {/* Header */}
       <div style={{ padding: "32px 28px 0", maxWidth: 960, margin: "0 auto" }}>
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 10, color: S.gold, letterSpacing: 4, marginBottom: 8, fontFamily: "'JetBrains Mono'" }}>
+          <div style={{ fontSize: 10, color: S.gold, letterSpacing: 4, marginBottom: 8, fontFamily: "'IBM Plex Mono'" }}>
             LP HEDGE STRATEGY · ETH/USDC
           </div>
-          <div style={{ fontSize: 32, fontFamily: "'Syne'", fontWeight: 800, letterSpacing: -1, lineHeight: 1.1 }}>
+          <div style={{ fontSize: 32, fontFamily: "'Space Grotesk'", fontWeight: 800, letterSpacing: -1, lineHeight: 1.1 }}>
             Simulador Completo
           </div>
-          <div style={{ fontSize: 12, color: S.textDim, marginTop: 6 }}>
+          <div style={{ fontSize: 13, color: S.textDim, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
             Pool concentrada · Short hedge · Put seguro · Polymarket timing
           </div>
         </div>
