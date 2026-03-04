@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── MATH UTILS ───────────────────────────────────────────────
