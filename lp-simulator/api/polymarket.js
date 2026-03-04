@@ -1,4 +1,4 @@
-// api/polymarket.js
+// api/polymarket.js — Vercel Serverless Function
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -8,82 +8,108 @@ export default async function handler(req, res) {
   try {
     let ethMarkets = [];
 
-    // Try 1: Events endpoint with crypto tag
-    const eventsRes = await fetch(
-      "https://gamma-api.polymarket.com/events?active=true&closed=false&limit=50&tag_slug=crypto",
-      { headers: { "Accept": "application/json", "User-Agent": "lp-simulator/1.0" } }
-    );
+    // Correct endpoint: search events with keyword, using proper field names
+    const urls = [
+      "https://gamma-api.polymarket.com/events?active=true&closed=false&limit=50&order=volume&ascending=false",
+      "https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100&order=volume&ascending=false",
+    ];
+
+    // Try events endpoint first
+    const eventsRes = await fetch(urls[0], {
+      headers: { "Accept": "application/json", "User-Agent": "lp-simulator/1.0" },
+    });
 
     if (eventsRes.ok) {
-      const data = await eventsRes.json();
-      const events = Array.isArray(data) ? data : (data.events || data.data || []);
+      const events = await eventsRes.json();
+      const eventsArr = Array.isArray(events) ? events : [];
 
-      for (const event of events) {
-        const q = (event.title || event.question || "").toLowerCase();
-        if ((!q.includes("ethereum") && !q.includes("eth")) ||
-            (!q.includes("price") && !q.includes("hit") && !q.includes("reach") && !q.includes("what"))) continue;
+      for (const event of eventsArr) {
+        const title = (event.title || "").toLowerCase();
+        if (!title.includes("ethereum") && !title.includes("eth")) continue;
+        if (!title.includes("price") && !title.includes("hit") && !title.includes("reach") && !title.includes("what")) continue;
 
         const markets = event.markets || [];
         const outcomes = [];
 
         for (const m of markets) {
-          const mq = m.question || m.groupItemTitle || m.title || "";
-          const priceMatch = mq.match(/\$?([\d,]+)/);
+          // Correct field: m.question for the outcome description
+          const q = m.question || m.groupItemTitle || "";
+          const priceMatch = q.match(/\$?([\d,]+)/);
           if (!priceMatch) continue;
           const strike = parseFloat(priceMatch[1].replace(",", ""));
           if (isNaN(strike) || strike < 500 || strike > 20000) continue;
 
-          const tokens = m.tokens || [];
-          const yesToken = tokens.find(t => (t.outcome||"").toLowerCase() === "yes") || tokens[0];
-          const odd = yesToken ? parseFloat(yesToken.price || 0) : parseFloat(m.lastTradePrice || 0);
-          if (odd <= 0) continue;
+          // Correct field: m.lastTradePrice is the current probability (0-1)
+          const odd = parseFloat(m.lastTradePrice || m.bestAsk || m.outcomePrices?.[0] || 0);
+          if (odd <= 0.005) continue;
 
           outcomes.push({
-            outcome: mq,
+            outcome: q,
+            strike,
+            odd,
+            oddPct: (odd * 100).toFixed(1),
+            payoffPer100: (100 / odd).toFixed(0),
+            isUp: !q.toLowerCase().includes("below") && !q.includes("↓"),
+            volume: parseFloat(m.volume || 0),
+          });
+        }
+
+        const upOutcomes = outcomes.filter(o => o.isUp).sort((a, b) => a.strike - b.strike);
+        if (upOutcomes.length > 0) {
+          ethMarkets.push({
+            id: event.id,
+            question: event.title,
+            endDate: event.endDate,
+            volume: event.volume,
+            outcomes: upOutcomes,
+          });
+        }
+      }
+    }
+
+    // Fallback: try markets endpoint directly
+    if (ethMarkets.length === 0) {
+      const marketsRes = await fetch(urls[1], {
+        headers: { "Accept": "application/json", "User-Agent": "lp-simulator/1.0" },
+      });
+
+      if (marketsRes.ok) {
+        const allMarkets = await marketsRes.json();
+        const arr = Array.isArray(allMarkets) ? allMarkets : [];
+
+        for (const m of arr) {
+          const q = (m.question || "").toLowerCase();
+          if (!q.includes("ethereum") && !q.includes("eth")) continue;
+          if (!q.includes("price") && !q.includes("hit") && !q.includes("reach")) continue;
+
+          const priceMatch = (m.question || "").match(/\$?([\d,]+)/);
+          if (!priceMatch) continue;
+          const strike = parseFloat(priceMatch[1].replace(",", ""));
+          if (isNaN(strike) || strike < 500 || strike > 20000) continue;
+
+          const odd = parseFloat(m.lastTradePrice || m.bestAsk || 0);
+          if (odd <= 0.005) continue;
+
+          // Group individual markets into a single "event"
+          let group = ethMarkets.find(g => g.id === (m.eventId || "direct"));
+          if (!group) {
+            group = { id: m.eventId || "direct", question: "ETH Weekly Price", endDate: m.endDate, volume: 0, outcomes: [] };
+            ethMarkets.push(group);
+          }
+          group.outcomes.push({
+            outcome: m.question,
             strike,
             odd,
             oddPct: (odd * 100).toFixed(1),
             payoffPer100: (100 / odd).toFixed(0),
             isUp: true,
-            volume: m.volume || 0,
+            volume: parseFloat(m.volume || 0),
           });
         }
 
-        if (outcomes.length > 0) {
-          outcomes.sort((a, b) => a.strike - b.strike);
-          ethMarkets.push({ id: event.id, question: event.title || "ETH Price", endDate: event.endDate, volume: event.volume, outcomes });
-        }
-      }
-    }
-
-    // Try 2: Direct slug search for weekly ETH markets
-    if (ethMarkets.length === 0) {
-      const slugRes = await fetch(
-        "https://gamma-api.polymarket.com/events?active=true&closed=false&limit=10&keyword=ethereum+price",
-        { headers: { "Accept": "application/json" } }
-      );
-      if (slugRes.ok) {
-        const data = await slugRes.json();
-        const events = Array.isArray(data) ? data : (data.events || data.data || []);
-        for (const event of events) {
-          const markets = event.markets || [];
-          const outcomes = [];
-          for (const m of markets) {
-            const mq = m.question || m.groupItemTitle || "";
-            const priceMatch = mq.match(/\$?([\d,]+)/);
-            if (!priceMatch) continue;
-            const strike = parseFloat(priceMatch[1].replace(",", ""));
-            if (isNaN(strike) || strike < 500 || strike > 20000) continue;
-            const tokens = m.tokens || [];
-            const yesToken = tokens.find(t => (t.outcome||"").toLowerCase() === "yes") || tokens[0];
-            const odd = yesToken ? parseFloat(yesToken.price || 0) : 0;
-            if (odd <= 0) continue;
-            outcomes.push({ outcome: mq, strike, odd, oddPct: (odd*100).toFixed(1), payoffPer100: (100/odd).toFixed(0), isUp: true, volume: m.volume || 0 });
-          }
-          if (outcomes.length > 0) {
-            outcomes.sort((a, b) => a.strike - b.strike);
-            ethMarkets.push({ id: event.id, question: event.title || "ETH Price", endDate: event.endDate, volume: event.volume, outcomes });
-          }
+        // Sort outcomes within each group
+        for (const g of ethMarkets) {
+          g.outcomes.sort((a, b) => a.strike - b.strike);
         }
       }
     }
@@ -92,6 +118,7 @@ export default async function handler(req, res) {
       success: ethMarkets.length > 0,
       markets: ethMarkets.slice(0, 3),
       fetchedAt: new Date().toISOString(),
+      debug: { found: ethMarkets.length },
     });
 
   } catch (error) {
