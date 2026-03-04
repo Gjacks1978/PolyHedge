@@ -311,7 +311,7 @@ function TabPolymarket() {
     const remainingDays = Math.max(0, totalDays - waitDays);
     const timeFactor = totalDays > 0 ? remainingDays / totalDays : 0;
     return Math.min(0.95, oddAfterPriceMove * timeFactor);
-  }, [betOdd, entryDay, waitDays, ethMoveWait, rangePct]);]);
+  }, [betOdd, entryDay, waitDays, ethMoveWait, rangePct]);
 
   const winPayoffAfterWait = betAmount / oddAfterWait;
 
