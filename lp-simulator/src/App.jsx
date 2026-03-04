@@ -115,8 +115,14 @@ function Stat({ label, value, color, small }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB 1 — LP + PUT SIMULATOR
 // ═══════════════════════════════════════════════════════════════
-function TabPut() {
+function TabPut({ liveEth, onSetAlert, requestAlertPermission }) {
   const [ethPrice, setEthPrice] = useState(2000);
+  const [alertSet, setAlertSet] = useState(false);
+
+  // Auto-fill ETH price when live data arrives
+  useEffect(() => {
+    if (liveEth && !alertSet) setEthPrice(Math.round(liveEth));
+  }, [liveEth]);
   const [capital, setCapital] = useState(4000);
   const [rangeLo, setRangeLo] = useState(10);
   const [rangeHi, setRangeHi] = useState(10);
@@ -296,6 +302,11 @@ function TabPut() {
           * P&L da LP não inclui fees · Prêmio calculado via Black-Scholes IV {(iv * 100).toFixed(0)}%aa
         </div>
       </div>
+
+      {/* Alert Setup */}
+      <AlertSetup ethPrice={ethPrice} plo={Plo} phi={Phi} capital={capital}
+        onSetAlert={onSetAlert} requestAlertPermission={requestAlertPermission}
+        alertSet={alertSet} setAlertSet={setAlertSet} />
     </div>
   );
 }
@@ -303,7 +314,7 @@ function TabPut() {
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — POLYMARKET HEDGE
 // ═══════════════════════════════════════════════════════════════
-function TabPolymarket() {
+function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   const [ethPrice, setEthPrice] = useState(2000);
   const [capital, setCapital] = useState(4000);
   const [rangeLo, setRangeLo] = useState(10);
@@ -311,6 +322,12 @@ function TabPolymarket() {
   const [apr, setApr] = useState(100);
   const [stopPct, setStopPct] = useState(2);
   const [betOdd, setBetOdd] = useState(0.15);
+  const [alertSet, setAlertSet] = useState(false);
+
+  // Auto-fill ETH price when live data arrives
+  useEffect(() => {
+    if (liveEth && !alertSet) setEthPrice(Math.round(liveEth));
+  }, [liveEth]);
   const [betAmount, setBetAmount] = useState(20);
   const [entryDay, setEntryDay] = useState(0);
   const [waitDays, setWaitDays] = useState(2);
@@ -361,7 +378,7 @@ function TabPolymarket() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} />
+      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} />
 
       {/* Pool + aposta inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -589,6 +606,11 @@ function TabPolymarket() {
           </tbody>
         </table>
       </div>
+
+      {/* Alert Setup */}
+      <AlertSetup ethPrice={ethPrice} plo={Plo} phi={Phi} capital={capital}
+        onSetAlert={onSetAlert} requestAlertPermission={requestAlertPermission}
+        alertSet={alertSet} setAlertSet={setAlertSet} />
 
       {/* Resumo previsibilidade */}
       <div className="card" style={{ borderColor: S.green + "40" }}>
@@ -854,9 +876,86 @@ function TabScenarios() {
 
 
 // ═══════════════════════════════════════════════════════════════
+// ALERT SETUP COMPONENT
+// ═══════════════════════════════════════════════════════════════
+function AlertSetup({ ethPrice, plo, phi, capital, onSetAlert, requestAlertPermission, alertSet, setAlertSet }) {
+  const [notifSupported] = useState("Notification" in window);
+  const [notifPerm, setNotifPerm] = useState(typeof Notification !== "undefined" ? Notification.permission : "denied");
+
+  const activate = async () => {
+    if (notifPerm !== "granted") {
+      const perm = await Notification.requestPermission();
+      setNotifPerm(perm);
+      if (perm !== "granted") return;
+    }
+    onSetAlert({ plo, phi, capital });
+    setAlertSet(true);
+  };
+
+  const deactivate = () => {
+    onSetAlert(null);
+    setAlertSet(false);
+  };
+
+  return (
+    <div className="card" style={{ borderColor: alertSet ? S.green + "60" : S.border, marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div className="label" style={{ color: alertSet ? S.green : S.textDim }}>
+            {alertSet ? "🔔 ALERTAS ATIVOS" : "🔔 ALERTAS DE RANGE"}
+          </div>
+          {alertSet ? (
+            <div style={{ fontSize: 12, color: S.text, fontFamily: "'Inter'", marginTop: 4 }}>
+              Monitorando ETH $${ethPrice} · Aviso quando chegar a 5% dos limites
+              <span style={{ color: S.red, marginLeft: 8 }}>↓${plo.toFixed(0)}</span>
+              <span style={{ color: S.dim, marginLeft: 4 }}>—</span>
+              <span style={{ color: S.green, marginLeft: 4 }}>↑${phi.toFixed(0)}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 4 }}>
+              Receba notificações quando ETH se aproximar dos limites da pool
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {alertSet ? (
+            <button onClick={deactivate}
+              style={{ background: S.red + "20", border: `1px solid ${S.red}40`, color: S.red,
+                padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "'Inter'", fontSize: 12 }}>
+              Desativar
+            </button>
+          ) : (
+            <button onClick={activate} disabled={!notifSupported}
+              style={{ background: S.green + "20", border: `1px solid ${S.green}40`, color: S.green,
+                padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontFamily: "'Inter'", fontSize: 12,
+                opacity: notifSupported ? 1 : 0.4 }}>
+              {!notifSupported ? "Não suportado" : notifPerm === "denied" ? "Permitir notificações" : "Ativar alertas"}
+            </button>
+          )}
+        </div>
+      </div>
+      {alertSet && (
+        <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {[
+            { label: "LIMITE INFERIOR", value: `$${plo.toFixed(0)}`, color: S.red },
+            { label: "PREÇO ATUAL", value: `$${ethPrice}`, color: S.gold },
+            { label: "LIMITE SUPERIOR", value: `$${phi.toFixed(0)}`, color: S.green },
+          ].map(item => (
+            <div key={item.label} style={{ textAlign: "center", padding: "8px", background: "#090914", borderRadius: 6 }}>
+              <div className="label">{item.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: item.color, fontFamily: "'Space Grotesk'" }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // POLYMARKET LIVE PANEL
 // ═══════════════════════════════════════════════════════════════
-function PolymarketLive({ ethPrice, rangePct }) {
+function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
   const [markets, setMarkets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -940,11 +1039,15 @@ function PolymarketLive({ ethPrice, rangePct }) {
             {(market.outcomes || []).map((o, i) => {
               const isTarget = bestMatch && o.strike === bestMatch.strike && parseFloat(o.odd) <= 0.50;
               return (
-                <div key={i} style={{
-                  padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
-                  background: isTarget ? S.green + "20" : "#090914",
-                  border: "1px solid " + (isTarget ? S.green : S.border),
-                }}>
+                <div key={i}
+                  onClick={() => onSelectOdd && parseFloat(o.odd) <= 0.50 && onSelectOdd(parseFloat(o.odd))}
+                  style={{
+                    padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
+                    background: isTarget ? S.green + "20" : "#090914",
+                    border: "1px solid " + (isTarget ? S.green : S.border),
+                    cursor: parseFloat(o.odd) <= 0.50 ? "pointer" : "default",
+                    transition: "all 0.15s",
+                  }}>
                   <div style={{ fontSize: 10, color: isTarget ? S.green : S.dim,
                     fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
                     {isTarget ? "★ " : ""}${o.strike.toLocaleString()}
@@ -955,6 +1058,11 @@ function PolymarketLive({ ethPrice, rangePct }) {
                   <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
                     paga ${o.payoffPer100}/$100
                   </div>
+                  {parseFloat(o.odd) <= 0.50 && (
+                    <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
+                      ↑ usar
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -984,6 +1092,52 @@ export default function App() {
   const [tab, setTab] = useState(0);
   const tabs = ["Put como Seguro", "Aposta Polymarket", "4 Cenários"];
 
+  // ── Live ETH price ──
+  const [liveEth, setLiveEth] = useState(null);
+  const [ethChange24h, setEthChange24h] = useState(null);
+  const [ethLoading, setEthLoading] = useState(false);
+
+  // ── Alert state: {active, plo, phi, capital} ──
+  const [alert, setAlert] = useState(null);
+
+  const fetchEthPrice = async () => {
+    setEthLoading(true);
+    try {
+      const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true");
+      const d = await r.json();
+      setLiveEth(d.ethereum.usd);
+      setEthChange24h(d.ethereum.usd_24h_change);
+    } catch {}
+    setEthLoading(false);
+  };
+
+  useEffect(() => {
+    fetchEthPrice();
+    const iv = setInterval(fetchEthPrice, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // ── Range alert checker ──
+  useEffect(() => {
+    if (!alert || !liveEth) return;
+    const { plo, phi } = alert;
+    const distLo = ((liveEth - plo) / plo * 100).toFixed(1);
+    const distHi = ((phi - liveEth) / phi * 100).toFixed(1);
+    const warningThreshold = 3; // within 3% of limit
+    if (liveEth <= plo * 1.03 || liveEth >= phi * 0.97) {
+      const side = liveEth <= plo * 1.03 ? "INFERIOR" : "SUPERIOR";
+      const dist = liveEth <= plo * 1.03 ? distLo : distHi;
+      if (Notification.permission === "granted") {
+        new Notification(`⚠ ETH próximo do limite ${side}`, {
+          body: `ETH $${liveEth.toFixed(0)} — a ${dist}% do limite. Monitore sua pool.`,
+          icon: "/favicon.ico"
+        });
+      }
+    }
+  }, [liveEth, alert]);
+
+  const requestAlertPermission = () => Notification.requestPermission();
+
   return (
     <div style={{ background: S.bg, minHeight: "100vh", color: S.text, fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
@@ -991,15 +1145,68 @@ export default function App() {
       {/* Header */}
       <div style={{ padding: "32px 28px 0", maxWidth: 960, margin: "0 auto" }}>
         <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 10, color: S.gold, letterSpacing: 4, marginBottom: 8, fontFamily: "'IBM Plex Mono'" }}>
-            LP HEDGE STRATEGY · ETH/USDC
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 10, color: S.gold, letterSpacing: 4, marginBottom: 8, fontFamily: "'IBM Plex Mono'" }}>
+                LP HEDGE STRATEGY · ETH/USDC
+              </div>
+              <div style={{ fontSize: 32, fontFamily: "'Space Grotesk'", fontWeight: 800, letterSpacing: -1, lineHeight: 1.1 }}>
+                Simulador Completo
+              </div>
+              <div style={{ fontSize: 13, color: S.textDim, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
+                Pool concentrada · Short hedge · Put seguro · Polymarket timing
+              </div>
+            </div>
+
+            {/* Live ETH price widget */}
+            <div style={{ textAlign: "right", minWidth: 140 }}>
+              <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", letterSpacing: 1, marginBottom: 4 }}>
+                ETH/USD AO VIVO
+              </div>
+              {liveEth ? (
+                <>
+                  <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Space Grotesk'", color: S.gold, lineHeight: 1 }}>
+                    ${liveEth.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </div>
+                  <div style={{ fontSize: 12, fontFamily: "'IBM Plex Mono'", marginTop: 4,
+                    color: ethChange24h >= 0 ? S.green : S.red }}>
+                    {ethChange24h >= 0 ? "▲" : "▼"} {Math.abs(ethChange24h).toFixed(2)}% 24h
+                  </div>
+                  <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                    atualiza a cada 30s
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
+                  {ethLoading ? "carregando..." : "—"}
+                </div>
+              )}
+            </div>
           </div>
-          <div style={{ fontSize: 32, fontFamily: "'Space Grotesk'", fontWeight: 800, letterSpacing: -1, lineHeight: 1.1 }}>
-            Simulador Completo
-          </div>
-          <div style={{ fontSize: 13, color: S.textDim, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
-            Pool concentrada · Short hedge · Put seguro · Polymarket timing
-          </div>
+
+          {/* Alert bar */}
+          {alert && liveEth && (() => {
+            const { plo, phi } = alert;
+            const distLo = ((liveEth - plo) / plo * 100);
+            const distHi = ((phi - liveEth) / phi * 100);
+            const nearLo = distLo <= 5;
+            const nearHi = distHi <= 5;
+            const danger = distLo <= 2 || distHi <= 2;
+            if (!nearLo && !nearHi) return null;
+            return (
+              <div style={{ marginTop: 12, padding: "10px 16px", borderRadius: 8,
+                background: danger ? S.red + "20" : S.gold + "15",
+                border: `1px solid ${danger ? S.red : S.gold}`,
+                display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{danger ? "🚨" : "⚠️"}</span>
+                <span style={{ fontSize: 13, fontFamily: "'Inter'", color: danger ? S.red : S.gold }}>
+                  {nearLo && `ETH a ${distLo.toFixed(1)}% do limite inferior ($${plo.toFixed(0)})`}
+                  {nearHi && `ETH a ${distHi.toFixed(1)}% do limite superior ($${phi.toFixed(0)})`}
+                  {danger ? " — ATENÇÃO IMEDIATA" : " — monitore de perto"}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Tabs */}
@@ -1016,8 +1223,8 @@ export default function App() {
 
       {/* Content */}
       <div style={{ padding: "0 28px 40px", maxWidth: 960, margin: "0 auto" }}>
-        {tab === 0 && <TabPut />}
-        {tab === 1 && <TabPolymarket />}
+        {tab === 0 && <TabPut liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
+        {tab === 1 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
         {tab === 2 && <TabScenarios />}
       </div>
     </div>
