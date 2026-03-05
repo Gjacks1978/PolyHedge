@@ -1083,7 +1083,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
   const [openOdd, setOpenOdd]         = useState(betOdd * 100);
   const [betAmt, setBetAmt]           = useState(20);
   const [ethMoveWed, setEthMoveWed]   = useState(4);
-  const [exitDay, setExitDay]         = useState(3);
+  const [exitDay, setExitDay]         = useState(7);
 
   // Sync: when openOdd changes here, update parent betOdd
   const handleOpenOddChange = (val) => {
@@ -1192,7 +1192,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
               <span className="label">DIA DE SAÍDA (VENDE A APOSTA)</span>
               <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{DAY_NAMES[exitDay]}</span>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {[2,3,4,5,6].map(d => (
                 <span key={d} className="pill"
                   style={{ background: exitDay===d ? S.gold : S.border,
@@ -1201,6 +1201,13 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
                   {DAY_NAMES[d]}
                 </span>
               ))}
+              <span className="pill"
+                style={{ background: exitDay===7 ? S.green : S.border,
+                  color: exitDay===7 ? "#000" : S.textDim, fontSize: 11,
+                  border: exitDay===7 ? "none" : `1px solid ${S.green}40` }}
+                onClick={() => setExitDay(7)}>
+                🏁 Vencimento
+              </span>
             </div>
           </div>
         </div>
@@ -1211,7 +1218,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
           <div style={{ padding: 16, background: "#090914", borderRadius: 10,
             border: `1px solid ${profitExit > 0 ? S.green : S.border}` }}>
             <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginBottom: 8 }}>
-              RESULTADO ESPERADO — SAÍDA {DAY_NAMES[exitDay].toUpperCase()}
+              {exitDay === 7 ? 'RESULTADO NO VENCIMENTO (DOM)' : `RESULTADO ESPERADO — SAÍDA ${DAY_NAMES[exitDay].toUpperCase()}`}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               <div style={{ textAlign: "center" }}>
@@ -1219,8 +1226,15 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
                 <div style={{ fontSize: 20, fontWeight: 800, color: S.red, fontFamily: "'Space Grotesk'" }}>-${betAmt}</div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>VENDE POR</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: S.green, fontFamily: "'Space Grotesk'" }}>+${resaleValue.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
+                  {exitDay === 7 ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? "PAYOFF MÁXIMO" : "EXPIRA SEM VALOR") : "VENDE POR"}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "'Space Grotesk'",
+                  color: exitDay === 7 ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? S.green : S.red) : S.green }}>
+                  {exitDay === 7
+                    ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? `+$${payoffMax.toFixed(0)}` : "$0")
+                    : `+$${resaleValue.toFixed(0)}`}
+                </div>
               </div>
             </div>
             <div style={{ textAlign: "center", padding: "10px", borderRadius: 8,
