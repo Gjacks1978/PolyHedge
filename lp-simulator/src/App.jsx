@@ -131,8 +131,8 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   }, [liveEth]);
   const [betAmount, setBetAmount] = useState(20);
   const [entryDay, setEntryDay] = useState(0);
-  const [waitDays, setWaitDays] = useState(2);
-  const [ethMoveWait, setEthMoveWait] = useState(1.5);
+  const [waitDays, setWaitDays] = useState(0);
+  const [ethMoveWait, setEthMoveWait] = useState(0);
 
   const Plo = ethPrice * (1 - rangeLo / 100);
   const Phi = ethPrice * (1 + rangeHi / 100);
