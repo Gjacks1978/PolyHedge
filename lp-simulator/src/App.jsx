@@ -185,7 +185,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} />
 
       {/* Early entry strategy panel */}
-      <EarlyEntryPanel ethPrice={ethPrice} />
+      <EarlyEntryPanel ethPrice={ethPrice} betOdd={betOdd} betAmount={betAmount} setBetOdd={setBetOdd} setBetAmount={setBetAmount} />
 
       {/* Pool + aposta inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -822,12 +822,12 @@ function TabScenarios() {
 // ═══════════════════════════════════════════════════════════════
 // EARLY ENTRY PANEL — Entrada na abertura com odd baixa
 // ═══════════════════════════════════════════════════════════════
-function EarlyEntryPanel({ ethPrice }) {
-  const [openOdd, setOpenOdd]         = useState(3);    // odd de abertura %
-  const [betAmt, setBetAmt]           = useState(20);   // valor apostado
-  const [ethMoveWed, setEthMoveWed]   = useState(4);    // movimento ETH até quarta %
-  const [exitDay, setExitDay]         = useState(3);    // dia de saída (1-7)
-  const [exitOdd, setExitOdd]         = useState(null); // calculado
+function EarlyEntryPanel({ ethPrice, betOdd, betAmount, setBetOdd, setBetAmount }) {
+  // Uses betOdd/betAmount from parent — no duplicate sliders
+  const openOdd    = betOdd * 100;        // % form
+  const betAmt     = betAmount;
+  const [ethMoveWed, setEthMoveWed] = useState(4);
+  const [exitDay, setExitDay]       = useState(3);
 
   // Strike alvo = ETH atual + 10%
   const strikeTarget = ethPrice ? Math.round(ethPrice * 1.10 / 100) * 100 : 2200;
@@ -875,34 +875,22 @@ function EarlyEntryPanel({ ethPrice }) {
 
         {/* Inputs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">ODD DE ABERTURA</span>
-              <span style={{ color: S.green, fontSize: 14, fontFamily: "'IBM Plex Mono'", fontWeight: 700 }}>
-                {openOdd}% → paga {multMax.toFixed(0)}x
+          <div style={{ padding: "10px 14px", background: S.gold+"10", borderRadius: 8,
+            border: `1px solid ${S.gold}30`, marginBottom: 2 }}>
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginBottom: 4 }}>USANDO DA CONFIGURAÇÃO ACIMA</div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, color: S.textDim, fontFamily: "'Inter'" }}>Odd de entrada</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: S.green, fontFamily: "'IBM Plex Mono'" }}>
+                {openOdd.toFixed(1)}% → {multMax.toFixed(0)}x
               </span>
             </div>
-            <input type="range" min={1} max={15} step={0.5}
-              value={openOdd} onChange={e => setOpenOdd(+e.target.value)} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
-              <span>1% (100x)</span><span>5% (20x)</span><span>10% (10x)</span><span>15% (7x)</span>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 13, color: S.textDim, fontFamily: "'Inter'" }}>Valor apostado</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: S.gold, fontFamily: "'IBM Plex Mono'" }}>${betAmt}</span>
             </div>
-            <div style={{ fontSize: 11, marginTop: 4, fontFamily: "'Inter'",
-              color: openOdd <= 3 ? S.green : openOdd <= 7 ? S.gold : S.textDim }}>
-              {openOdd <= 2 ? "🔥 Assimetria extrema — raro mas acontece" :
-               openOdd <= 5 ? "✅ Zona ideal — melhor relação risco/retorno" :
-               openOdd <= 10 ? "⚠ Razoável — ETH já tem algum momentum" :
-               "⛔ Odds altas — não é entrada de abertura"}
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter'", marginTop: 6 }}>
+              Altere os valores no painel "Configuração da Aposta" acima ↑
             </div>
-          </div>
-
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">VALOR APOSTADO</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>${betAmt}</span>
-            </div>
-            <input type="range" min={5} max={100} step={5}
-              value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
           </div>
 
           <div>
