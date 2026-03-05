@@ -661,15 +661,50 @@ function generatePath(scenario) {
       if (i < 12) return 1880 + Math.sin((i - 4) * 0.7) * 42 + (seed(i + 250) - 0.5) * 16;
       return 1880 + (i - 11) * 105 + (seed(i + 300) - 0.5) * 16;
     });
+    // Cenário 5 — Saída antecipada (sobe forte dia 3, fecha com lucro parcial)
+    case 4: return Array.from({ length: 14 }, (_, i) => {
+      if (i < 3) return 2000 + i * 48 + (seed(i + 400) - 0.5) * 12;
+      if (i < 6) return 2144 + (seed(i + 420) - 0.5) * 18; // plateau próximo do topo
+      return 2144 - (i - 5) * 12 + (seed(i + 440) - 0.5) * 20; // começa a cair
+    });
+    // Cenário 6 — Rebalanceamento (ETH se aproxima do limite, fecha e reabre)
+    case 5: return Array.from({ length: 28 }, (_, i) => {
+      if (i < 8) return 2000 + i * 22 + (seed(i + 500) - 0.5) * 20;  // sobe suave
+      if (i < 10) return 2176 + (seed(i + 520) - 0.5) * 15;           // próximo do topo ≈ 2180
+      if (i < 18) return 2050 + Math.sin((i-10) * 0.9) * 55 + (seed(i + 540) - 0.5) * 18; // novo range
+      if (i < 22) return 2050 + (i-17) * 30 + (seed(i + 560) - 0.5) * 15;
+      return 2170 + (seed(i + 580) - 0.5) * 20;
+    });
+    // Cenário 7 — Chop (oscila muito, fecha flat, apostas viram pó)
+    case 6: return Array.from({ length: 21 }, (_, i) => {
+      return 2000 + Math.sin(i * 1.4) * 85 + Math.cos(i * 2.1) * 40 + (seed(i + 600) - 0.5) * 30;
+    });
+    // Cenário 8 — 2 meses no range (8 semanas, aposta toda semana, valem?)
+    case 7: return Array.from({ length: 62 }, (_, i) => {
+      const base = 2000 + Math.sin(i * 0.18) * 70 + Math.sin(i * 0.42) * 35;
+      return base + (seed(i + 700) - 0.5) * 28;
+    });
     default: return [];
   }
 }
 
 const SCENARIO_META = [
-  { title: "Cenário 1", subtitle: "Lateral 2-3 semanas → cai ao fundo", color: "#f06060", desc: "ETH oscila dentro do range por ~18 dias acumulando fees, depois cai e toca o limite inferior. Aposta não serve, mas fees absorvem tudo." },
-  { title: "Cenário 2", subtitle: "Sobe rápido em 2 dias", color: "#3dd68c", desc: "ETH dispara e toca o limite superior em 2 dias. Pouco fee acumulado, mas aposta paga e transforma o stop em lucro." },
-  { title: "Cenário 3", subtitle: "Lateral 3+ semanas → rompe para cima", color: "#5b9cf6", desc: "ETH oscila por 21 dias acumulando fees generosas, depois rompe. Custo das apostas renovadas é absorvido pelas fees." },
-  { title: "Cenário 4", subtitle: "Cai → lateral → rompe em 2 semanas", color: "#a78bfa", desc: "ETH cai inicialmente, estabiliza, depois rompe para cima em ~14 dias. Aposta salva a saída pelo topo." },
+  { title: "Cenário 1", subtitle: "Lateral 2-3 semanas → cai ao fundo", color: "#f06060",
+    desc: "ETH oscila dentro do range por ~18 dias acumulando fees, depois cai e toca o limite inferior. Aposta não serve, mas fees absorvem tudo." },
+  { title: "Cenário 2", subtitle: "Sobe rápido em 2 dias", color: "#3dd68c",
+    desc: "ETH dispara e toca o limite superior em 2 dias. Pouco fee acumulado, mas aposta paga e transforma o stop em lucro." },
+  { title: "Cenário 3", subtitle: "Lateral 3+ semanas → rompe para cima", color: "#5b9cf6",
+    desc: "ETH oscila por 21 dias acumulando fees generosas, depois rompe. Custo das apostas renovadas é absorvido pelas fees." },
+  { title: "Cenário 4", subtitle: "Cai → lateral → rompe em 2 semanas", color: "#a78bfa",
+    desc: "ETH cai inicialmente, estabiliza, depois rompe para cima em ~14 dias. Aposta salva a saída pelo topo." },
+  { title: "Cenário 5", subtitle: "Saída antecipada no dia 5", color: "#f59e0b",
+    desc: "ETH sobe forte e chega a 93% do limite superior no dia 3. Você fecha a posição e vende a aposta pelo valor de mercado (≈55% do payoff máximo). Realize o ganho parcial ou aguarda o toque?" },
+  { title: "Cenário 6", subtitle: "Rebalanceamento no limite", color: "#06b6d4",
+    desc: "ETH se aproxima do topo no dia 8 sem tocar. Você fecha, paga gas + spread, e reabre no novo range centrado em $2.150. Custo real do rebalanceamento vs risco de sair pelo limite sem hedge." },
+  { title: "Cenário 7", subtitle: "Chop: oscila muito, fecha flat", color: "#e879f9",
+    desc: "ETH oscila ±8% dentro do range durante 3 semanas mas fecha próximo do preço de entrada. Fees boas pelas oscilações, mas cada aposta semanal virou pó. Vale a pena hedgear em mercados laterais voláteis?" },
+  { title: "Cenário 8", subtitle: "2 meses no range — aposta toda semana?", color: "#34d399",
+    desc: "ETH permanece no range por 8 semanas completas. 8 apostas consecutivas, todas expiram sem valor. As fees acumuladas justificam o custo total do hedge? Quando parar de apostar?" },
 ];
 
 function MiniChart({ path, color, exitIdx, exitType }) {
@@ -730,12 +765,13 @@ function MiniChart({ path, color, exitIdx, exitType }) {
   return <canvas ref={canvasRef} width={380} height={160} style={{ width: "100%", height: 160, borderRadius: 6 }} />;
 }
 
-function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr = 100, stopPct = 2) {
-  const LOWER = 1800, UPPER = 2200, ENTRY = 2000;
+function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr = 100, stopPct = 2, scenarioIdx = 0) {
+  const LOWER = 1800, UPPER = 2200;
   const feesDay = capital * (apr / 100) / 365;
   const stop = capital * stopPct / 100;
   const winPayoff = betAmount / betOdd;
   let fees = 0, exitDay = null, exitType = null;
+
   for (let i = 0; i < path.length; i++) {
     const p = path[i];
     if (p >= LOWER && p <= UPPER) fees += feesDay;
@@ -745,13 +781,82 @@ function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr =
     }
   }
   if (exitDay === null) { exitDay = path.length - 1; exitType = "still_in"; }
+
   const weeksActive = Math.ceil((exitDay + 1) / 7);
   const totalBetCost = betAmount * weeksActive;
   const betPayoff = exitType === "upper" ? winPayoff : 0;
   const lpPnL = exitType === "still_in" ? fees : fees - stop;
-  const netPnL = lpPnL + betPayoff - totalBetCost;
-  const netWithout = lpPnL;
-  return { fees, exitDay, exitType, weeksActive, totalBetCost, betPayoff, lpPnL, netPnL, netWithout, winPayoff, stop };
+  let netPnL = lpPnL + betPayoff - totalBetCost;
+  let netWithout = lpPnL;
+  let extra = {};
+
+  // Scenario 5: Early exit — sell bet at 55% of max payoff on day 5
+  if (scenarioIdx === 4) {
+    const earlyExitDay = 5;
+    const feesEarly = feesDay * earlyExitDay;
+    const betResaleValue = winPayoff * 0.55; // sell bet at 55% before expiry
+    const betCost = betAmount;
+    const lpPnLEarly = feesEarly; // still in range, no stop
+    const netEarly = lpPnLEarly + betResaleValue - betCost;
+    const netWait = lpPnL + betPayoff - totalBetCost; // if waits til expiry
+    extra = { earlyExitDay, feesEarly, betResaleValue, netEarly, netWait,
+      insight: `Saída dia ${earlyExitDay}: +$${feesEarly.toFixed(0)} fees + $${betResaleValue.toFixed(0)} aposta (55% do máx) = $${netEarly.toFixed(0)} vs aguardar = $${netWait.toFixed(0)}` };
+    netPnL = netEarly;
+    exitDay = earlyExitDay;
+    exitType = "early";
+  }
+
+  // Scenario 6: Rebalance cost — gas + spread + fees lost during reopen (≈1.5 days of fees + $15 gas)
+  if (scenarioIdx === 5) {
+    const rebalanceDay = 8;
+    const feesBeforeRebal = feesDay * rebalanceDay;
+    const rebalanceCost = feesDay * 1.5 + 15; // 1.5 days lost fees + gas
+    const feesAfterRebal = feesDay * (path.length - rebalanceDay); // continues in new range
+    const totalFees = feesBeforeRebal + feesAfterRebal;
+    const netWithRebal = totalFees - rebalanceCost - totalBetCost;
+    const netWithoutRebal = lpPnL - totalBetCost; // risk: could hit limit
+    extra = { rebalanceDay, rebalanceCost: rebalanceCost.toFixed(0), feesBeforeRebal: feesBeforeRebal.toFixed(0),
+      feesAfterRebal: feesAfterRebal.toFixed(0),
+      insight: `Custo rebalanceamento dia ${rebalanceDay}: $${rebalanceCost.toFixed(0)} (gas + ${1.5} dias de fees perdidas). Fees totais: $${totalFees.toFixed(0)}. Evita stop de $${stop.toFixed(0)}.` };
+    netPnL = netWithRebal;
+    netWithout = netWithoutRebal;
+  }
+
+  // Scenario 7: Chop — all bets expire worthless, but fees are good
+  if (scenarioIdx === 6) {
+    const chopWeeks = 3;
+    const totalBets = betAmount * chopWeeks;
+    const chopFees = fees;
+    const netChopWithBet = chopFees - totalBets;
+    const netChopWithout = chopFees;
+    const hedgeEfficiency = (totalBets / chopFees * 100).toFixed(0);
+    extra = { chopWeeks, totalBets, chopFees: chopFees.toFixed(0), hedgeEfficiency,
+      insight: `${chopWeeks} apostas expiram sem valor (-$${totalBets}). Fees: +$${chopFees.toFixed(0)}. Custo do hedge = ${hedgeEfficiency}% das fees. ${parseFloat(hedgeEfficiency) < 30 ? "✓ Razoável" : "⚠ Custo alto — considere só apostar com viés"}` };
+    netPnL = netChopWithBet;
+    netWithout = netChopWithout;
+  }
+
+  // Scenario 8: 2 months in range — weekly bet question
+  if (scenarioIdx === 7) {
+    const weeks8 = 8;
+    const totalBets8 = betAmount * weeks8;
+    const fees8 = feesDay * 62;
+    const netWith8 = fees8 - totalBets8;
+    const netWithout8 = fees8;
+    const breakEvenWeeks = Math.ceil(fees8 / betAmount);
+    // When does it stop making sense to bet? After absorbing stop loss fully
+    const weeksToAbsorbStop = Math.ceil(stop / betAmount);
+    const betEfficiency = (totalBets8 / fees8 * 100).toFixed(0);
+    extra = { weeks8, totalBets8, fees8: fees8.toFixed(0), netWith8, netWithout8,
+      breakEvenWeeks, weeksToAbsorbStop, betEfficiency,
+      insight: `8 semanas no range: fees $${fees8.toFixed(0)}, 8 apostas -$${totalBets8}. Stop = $${stop.toFixed(0)} = ${weeksToAbsorbStop} semanas de aposta. Após absorver o stop (sem.${weeksToAbsorbStop}+), apostar deixa de compensar? Eficiência do hedge: ${betEfficiency}% das fees.` };
+    netPnL = netWith8;
+    netWithout = netWithout8;
+    exitDay = 61;
+    exitType = "still_in";
+  }
+
+  return { fees, exitDay, exitType, weeksActive, totalBetCost, betPayoff, lpPnL, netPnL, netWithout, winPayoff, stop, extra };
 }
 
 function TabScenarios() {
@@ -764,7 +869,7 @@ function TabScenarios() {
   const [rangeHi3, setRangeHi3] = useState(10);
   const [activeIdx, setActiveIdx] = useState(null);
   const paths = useMemo(() => SCENARIO_META.map((_, i) => generatePath(i)), []);
-  const results = useMemo(() => paths.map(p => calcScenario(p, betOdd, betAmount, capital, apr, stopPct)), [paths, betOdd, betAmount, capital, apr, stopPct]);
+  const results = useMemo(() => paths.map((p, i) => calcScenario(p, betOdd, betAmount, capital, apr, stopPct, i)), [paths, betOdd, betAmount, capital, apr, stopPct]);
   const DAY_LABELS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Dom"];
 
   return (
@@ -837,8 +942,9 @@ function TabScenarios() {
               {isActive && (
                 <div className="insight" style={{ borderColor: sc.color }}>
                   <strong style={{ color: sc.color }}>{sc.title}:</strong> {sc.desc}
-                  {r.exitType === "upper" && <><br /><strong style={{ color: S.green }}>Aposta pagou ${r.betPayoff.toFixed(0)}</strong> — stop de $${r.stop.toFixed(0)} virou {r.netPnL >= 0 ? `lucro de $${r.netPnL.toFixed(0)}` : `perda mínima de $${Math.abs(r.netPnL).toFixed(0)}`}.</>}
-                  {r.exitType === "lower" && <><br />Aposta não serviu (custo ${r.totalBetCost}). Fees de ${r.fees.toFixed(0)} {r.lpPnL >= 0 ? "cobriram o stop" : `não cobriram o stop de $${r.stop.toFixed(0)}`}.</>}
+                  {r.extra?.insight && <><br /><br /><span style={{ color: S.gold }}>📊 {r.extra.insight}</span></>}
+                  {!r.extra?.insight && r.exitType === "upper" && <><br /><strong style={{ color: S.green }}>Aposta pagou ${r.betPayoff.toFixed(0)}</strong> — stop de $${r.stop.toFixed(0)} virou {r.netPnL >= 0 ? `lucro de $${r.netPnL.toFixed(0)}` : `perda mínima de $${Math.abs(r.netPnL).toFixed(0)}`}.</>}
+                  {!r.extra?.insight && r.exitType === "lower" && <><br />Aposta não serviu (custo ${r.totalBetCost}). Fees de ${r.fees.toFixed(0)} {r.lpPnL >= 0 ? "cobriram o stop" : `não cobriram o stop de $${r.stop.toFixed(0)}`}.</>}
                   <br /><strong style={{ color: S.gold }}>Diferença com aposta: {fmtUSD(r.netPnL - r.netWithout)}</strong>
                 </div>
               )}
