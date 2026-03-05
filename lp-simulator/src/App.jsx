@@ -441,6 +441,263 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
           <strong style={{ color: S.gold }}> APR líquido: {(apr - (betAmount * 52 / capital * 100)).toFixed(0)}% aa</strong>
         </div>
       </div>
+
+      {/* Strategy Overview Chart */}
+      <StrategyChart
+        ethPrice={ethPrice} capital={capital} rangeLo={rangeLo} rangeHi={rangeHi}
+        apr={apr} stopPct={stopPct} betOdd={betOdd} betAmount={betAmount}
+      />
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// STRATEGY CHART COMPONENT
+// ═══════════════════════════════════════════════════════════════
+function StrategyChart({ ethPrice, capital, rangeLo, rangeHi, apr, stopPct, betOdd, betAmount }) {
+  const canvasRef = useRef(null);
+
+  const Plo      = ethPrice * (1 - rangeLo / 100);
+  const Phi      = ethPrice * (1 + rangeHi / 100);
+  const feesDay  = capital * (apr / 100) / 365;
+  const stop     = capital * stopPct / 100;
+  const payoff   = betAmount / betOdd;
+
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx    = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Layout ──────────────────────────────────────────────────
+    const pad   = { t: 40, b: 50, l: 60, r: 160 };
+    const cW    = W - pad.l - pad.r;
+    const cH    = H - pad.t - pad.b;
+    const DAYS  = 28; // 4 weeks
+
+    // Price range for Y axis
+    const minP  = ethPrice * 0.60;
+    const maxP  = ethPrice * 1.30;
+    const xS    = d => pad.l + (d / (DAYS - 1)) * cW;
+    const yS    = p => pad.t + cH - ((p - minP) / (maxP - minP)) * cH;
+
+    // ── Background ──────────────────────────────────────────────
+    ctx.fillStyle = "#070710";
+    ctx.fillRect(0, 0, W, H);
+
+    // ── LP Range zone (gold fill) ────────────────────────────────
+    ctx.fillStyle = "rgba(232,184,75,0.07)";
+    ctx.fillRect(pad.l, yS(Phi), cW, yS(Plo) - yS(Phi));
+
+    // ── Fee accumulation area (inside range, green gradient) ─────
+    // Show fees as a growing band from bottom of range
+    const grad = ctx.createLinearGradient(pad.l, 0, pad.l + cW, 0);
+    grad.addColorStop(0, "rgba(61,214,140,0.0)");
+    grad.addColorStop(1, "rgba(61,214,140,0.12)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(pad.l, yS(Phi), cW * 0.75, yS(Plo) - yS(Phi));
+
+    // ── Grid lines (weeks) ───────────────────────────────────────
+    ctx.strokeStyle = "#1a1a2e"; ctx.lineWidth = 1;
+    [7, 14, 21].forEach(d => {
+      ctx.beginPath();
+      ctx.setLineDash([3, 4]);
+      ctx.moveTo(xS(d), pad.t);
+      ctx.lineTo(xS(d), pad.t + cH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#454560";
+      ctx.font = "9px IBM Plex Mono";
+      ctx.textAlign = "center";
+      ctx.fillText(`Sem ${d/7}`, xS(d), H - 10);
+    });
+    // Day 0 label
+    ctx.fillStyle = "#454560"; ctx.font = "9px IBM Plex Mono"; ctx.textAlign = "center";
+    ctx.fillText("Entrada", xS(0), H - 10);
+    ctx.fillText("Sem 4", xS(27), H - 10);
+
+    // ── Y axis price labels ──────────────────────────────────────
+    [Plo, ethPrice, Phi].forEach((p, i) => {
+      const colors = ["#f06060", "#e8b84b", "#3dd68c"];
+      const labels = ["Limite ↓", "Entrada", "Limite ↑"];
+      ctx.strokeStyle = colors[i] + "60"; ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(pad.l, yS(p)); ctx.lineTo(pad.l + cW, yS(p)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = colors[i];
+      ctx.font = "bold 9px IBM Plex Mono";
+      ctx.textAlign = "right";
+      ctx.fillText(`$${Math.round(p)}`, pad.l - 4, yS(p) + 3);
+      ctx.textAlign = "left";
+      ctx.fillStyle = colors[i] + "90";
+      ctx.font = "8px IBM Plex Mono";
+      ctx.fillText(labels[i], pad.l + cW + 6, yS(p) + 3);
+    });
+
+    // ── Scenario paths ───────────────────────────────────────────
+    const seed = n => Math.sin(n * 9301 + 49297) * 0.5 + 0.5;
+
+    // Path A: stays in range 4 weeks (main scenario — fees)
+    const pathRange = Array.from({ length: DAYS }, (_, i) =>
+      ethPrice + Math.sin(i * 0.55) * (ethPrice * 0.055) + Math.cos(i * 1.1) * (ethPrice * 0.025) + (seed(i + 10) - 0.5) * (ethPrice * 0.015)
+    );
+
+    // Path B: breaks upper on day 12
+    const pathUpper = Array.from({ length: DAYS }, (_, i) => {
+      if (i < 10) return ethPrice + Math.sin(i * 0.5) * (ethPrice * 0.04) + (seed(i + 50) - 0.5) * (ethPrice * 0.01);
+      if (i < 13) return ethPrice * (1 + (i - 9) * 0.035) + (seed(i + 50) - 0.5) * (ethPrice * 0.008);
+      return Phi + (seed(i + 60) - 0.5) * (ethPrice * 0.01);
+    });
+
+    // Path C: breaks lower on day 18
+    const pathLower = Array.from({ length: DAYS }, (_, i) => {
+      if (i < 15) return ethPrice - Math.sin(i * 0.4) * (ethPrice * 0.03) + (seed(i + 90) - 0.5) * (ethPrice * 0.012);
+      if (i < 19) return ethPrice * (1 - (i - 14) * 0.028) + (seed(i + 90) - 0.5) * (ethPrice * 0.008);
+      return Plo - (seed(i + 100) - 0.5) * (ethPrice * 0.008);
+    });
+
+    // Draw Path A (range — dashed gold, full width)
+    ctx.beginPath(); ctx.strokeStyle = "#e8b84b80"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+    pathRange.forEach((p, i) => i === 0 ? ctx.moveTo(xS(i), yS(p)) : ctx.lineTo(xS(i), yS(p)));
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Draw Path B (upper break — green solid up to exit, ghost after)
+    const exitB = 12;
+    ctx.beginPath(); ctx.strokeStyle = "#3dd68c"; ctx.lineWidth = 2;
+    ctx.shadowColor = "#3dd68c"; ctx.shadowBlur = 4;
+    pathUpper.slice(0, exitB + 1).forEach((p, i) => i === 0 ? ctx.moveTo(xS(i), yS(p)) : ctx.lineTo(xS(i), yS(p)));
+    ctx.stroke(); ctx.shadowBlur = 0;
+    // Ghost continuation
+    ctx.beginPath(); ctx.strokeStyle = "#3dd68c25"; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    pathUpper.slice(exitB).forEach((p, i) => i === 0 ? ctx.moveTo(xS(exitB + i), yS(p)) : ctx.lineTo(xS(exitB + i), yS(p)));
+    ctx.stroke(); ctx.setLineDash([]);
+    // Exit dot
+    ctx.beginPath(); ctx.arc(xS(exitB), yS(pathUpper[exitB]), 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#3dd68c"; ctx.fill();
+
+    // Draw Path C (lower break — red solid up to exit)
+    const exitC = 18;
+    ctx.beginPath(); ctx.strokeStyle = "#f06060"; ctx.lineWidth = 2;
+    ctx.shadowColor = "#f06060"; ctx.shadowBlur = 4;
+    pathLower.slice(0, exitC + 1).forEach((p, i) => i === 0 ? ctx.moveTo(xS(i), yS(p)) : ctx.lineTo(xS(i), yS(p)));
+    ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.strokeStyle = "#f0606025"; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    pathLower.slice(exitC).forEach((p, i) => i === 0 ? ctx.moveTo(xS(exitC + i), yS(p)) : ctx.lineTo(xS(exitC + i), yS(p)));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(xS(exitC), yS(pathLower[exitC]), 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#f06060"; ctx.fill();
+
+    // ── Fee accumulation bar (bottom strip) ─────────────────────
+    const feeBarH = 6;
+    const feeBarY = pad.t + cH + 16;
+    // Background track
+    ctx.fillStyle = "#1a1a2e";
+    ctx.beginPath(); ctx.roundRect(pad.l, feeBarY, cW, feeBarH, 3); ctx.fill();
+    // Growing fee bar (for range scenario — full 4 weeks)
+    const feeTotal = feesDay * DAYS;
+    const feeBarW  = cW * 0.75; // ~3 weeks in range before exit
+    const feeGrad  = ctx.createLinearGradient(pad.l, 0, pad.l + feeBarW, 0);
+    feeGrad.addColorStop(0, "#3dd68c40");
+    feeGrad.addColorStop(1, "#3dd68c");
+    ctx.fillStyle = feeGrad;
+    ctx.beginPath(); ctx.roundRect(pad.l, feeBarY, feeBarW, feeBarH, 3); ctx.fill();
+
+    // ── Annotations ─────────────────────────────────────────────
+    ctx.textAlign = "left";
+
+    // Title
+    ctx.fillStyle = "#e8b84b";
+    ctx.font = "bold 11px Space Grotesk";
+    ctx.fillText("ESTRATÉGIA LP HEDGE", pad.l, 20);
+    ctx.fillStyle = "#454560";
+    ctx.font = "9px IBM Plex Mono";
+    ctx.fillText(`Capital $${capital.toLocaleString()} · APR ${apr}% · Stop ${stopPct}% · Aposta ${(betOdd*100).toFixed(0)}%`, pad.l, 32);
+
+    // Right-side outcome boxes
+    const boxX  = pad.l + cW + 8;
+    const boxW  = pad.r - 14;
+
+    // Outcome: Upper break
+    const netUpper = feesDay * exitB - stop + payoff - betAmount;
+    ctx.fillStyle = "#3dd68c20";
+    ctx.beginPath(); ctx.roundRect(boxX, yS(Phi) - 12, boxW, 46, 4); ctx.fill();
+    ctx.strokeStyle = "#3dd68c50"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(boxX, yS(Phi) - 12, boxW, 46, 4); ctx.stroke();
+    ctx.fillStyle = "#3dd68c"; ctx.font = "bold 10px Space Grotesk"; ctx.textAlign = "center";
+    ctx.fillText("↑ TOPO", boxX + boxW/2, yS(Phi) + 4);
+    ctx.font = "bold 12px Space Grotesk";
+    ctx.fillText(`${netUpper >= 0 ? "+" : ""}$${netUpper.toFixed(0)}`, boxX + boxW/2, yS(Phi) + 18);
+    ctx.fillStyle = "#3dd68c80"; ctx.font = "8px IBM Plex Mono";
+    ctx.fillText(`aposta paga $${payoff.toFixed(0)}`, boxX + boxW/2, yS(Phi) + 30);
+
+    // Outcome: Range (fees)
+    const feesRange = feesDay * DAYS;
+    ctx.fillStyle = "#e8b84b15";
+    ctx.beginPath(); ctx.roundRect(boxX, yS(ethPrice) - 24, boxW, 48, 4); ctx.fill();
+    ctx.strokeStyle = "#e8b84b40"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(boxX, yS(ethPrice) - 24, boxW, 48, 4); ctx.stroke();
+    ctx.fillStyle = "#e8b84b"; ctx.font = "bold 10px Space Grotesk"; ctx.textAlign = "center";
+    ctx.fillText("↔ RANGE", boxX + boxW/2, yS(ethPrice) - 8);
+    ctx.font = "bold 12px Space Grotesk";
+    ctx.fillText(`+$${(feesRange - betAmount * (DAYS/7)).toFixed(0)}`, boxX + boxW/2, yS(ethPrice) + 6);
+    ctx.fillStyle = "#e8b84b80"; ctx.font = "8px IBM Plex Mono";
+    ctx.fillText(`fees - apostas`, boxX + boxW/2, yS(ethPrice) + 18);
+
+    // Outcome: Lower break
+    const netLower = feesDay * exitC - stop - betAmount;
+    ctx.fillStyle = "#f0606015";
+    ctx.beginPath(); ctx.roundRect(boxX, yS(Plo) - 34, boxW, 48, 4); ctx.fill();
+    ctx.strokeStyle = "#f0606040"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(boxX, yS(Plo) - 34, boxW, 48, 4); ctx.stroke();
+    ctx.fillStyle = "#f06060"; ctx.font = "bold 10px Space Grotesk"; ctx.textAlign = "center";
+    ctx.fillText("↓ FUNDO", boxX + boxW/2, yS(Plo) - 18);
+    ctx.font = "bold 12px Space Grotesk";
+    ctx.fillText(`${netLower >= 0 ? "+" : ""}$${netLower.toFixed(0)}`, boxX + boxW/2, yS(Plo) - 4);
+    ctx.fillStyle = "#f0606080"; ctx.font = "8px IBM Plex Mono";
+    ctx.fillText(`short amortece`, boxX + boxW/2, yS(Plo) + 8);
+
+    // Bet annotation (weekly flag on path B)
+    [0, 7, 12].forEach((d, i) => {
+      if (d >= exitB && i > 0) return;
+      const p = pathUpper[d];
+      ctx.fillStyle = i === 0 ? "#e8b84b" : d < exitB ? "#e8b84b80" : "#3dd68c";
+      ctx.beginPath(); ctx.arc(xS(d), yS(p) - 14, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = i === 0 ? "#e8b84b" : "#e8b84b60";
+      ctx.font = "8px IBM Plex Mono"; ctx.textAlign = "center";
+      ctx.fillText(i === 0 ? `$${betAmount}` : d < exitB ? `$${betAmount}` : "paga!", xS(d), yS(p) - 20);
+    });
+
+    // Fee bar label
+    ctx.fillStyle = "#3dd68c";
+    ctx.font = "8px IBM Plex Mono"; ctx.textAlign = "left";
+    ctx.fillText(`fees acumuladas: +$${(feesDay * DAYS * 0.75).toFixed(0)} (range)`, pad.l + 4, feeBarY - 3);
+
+  }, [ethPrice, capital, rangeLo, rangeHi, apr, stopPct, betOdd, betAmount]);
+
+  return (
+    <div className="card" style={{ borderColor: S.gold + "40" }}>
+      <div className="label" style={{ marginBottom: 12, color: S.gold }}>VISÃO GERAL DA ESTRATÉGIA</div>
+      <canvas ref={canvasRef} width={820} height={320}
+        style={{ width: "100%", height: "auto", borderRadius: 8, display: "block" }} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
+        {[
+          { color: S.green,   dash: false, label: "Saída pelo topo",  sub: "Aposta cobre o stop → lucro" },
+          { color: S.gold,    dash: true,  label: "Lateral no range", sub: "Fees acumulam semana a semana" },
+          { color: S.red,     dash: false, label: "Saída pelo fundo", sub: "Short + aposta amortece o stop" },
+        ].map(item => (
+          <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 12px", background: "#090914", borderRadius: 6 }}>
+            <div style={{ width: 24, height: 2, background: item.color,
+              borderTop: item.dash ? `2px dashed ${item.color}` : "none",
+              opacity: item.dash ? 1 : 1, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 11, color: item.color, fontFamily: "'IBM Plex Mono'", fontWeight: 600 }}>{item.label}</div>
+              <div style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter'", marginTop: 1 }}>{item.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -842,28 +1099,30 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
 
   // Odd no dia de saída — modelo simples baseado em movimento de preço e tempo
   const exitOddCalc = useMemo(() => {
-    // Se ETH subiu X% em direção ao strike, qual a odd estimada?
-    const distToStrike = ((strikeTarget - ethPrice) / ethPrice * 100); // % faltando para o strike
-    const pctCovered   = Math.min(1, ethMoveWed / distToStrike);
-    // Mais próximo do strike = odd muito maior
-    const priceEffect  = openOddDec * (1 + pctCovered * 8); // 0% move = 1x, 100% move = 9x
-    // Time decay pelo dia de saída (7 dias = semana completa)
+    // Odd de saída = abertura ajustada por movimento de preço + time decay
+    const distToStrike = Math.max(1, (strikeTarget - ethPrice) / ethPrice * 100);
+    const pctCovered   = Math.min(0.99, ethMoveWed / distToStrike);
+    // Quanto mais próximo do strike, maior a odd (mercado reprecia)
+    const priceEffect  = openOddDec * (1 + pctCovered * 7);
+    // Time decay: menos dias restantes = odd menor (menos tempo para acontecer)
     const timeDecay    = Math.max(0.05, (7 - exitDay) / 7);
-    const rawOdd       = Math.min(0.92, priceEffect * timeDecay);
-    return rawOdd;
+    return Math.min(0.92, priceEffect * timeDecay);
   }, [openOdd, ethMoveWed, exitDay, strikeTarget, ethPrice]);
 
-  const exitPayoff    = betAmt / exitOddCalc;
-  const profitExit    = exitPayoff - betAmt;
-  const multExit      = exitPayoff / betAmt;
-  const roi           = ((exitPayoff - betAmt) / betAmt * 100);
+  // Valor de revenda = custo original × (odd saída / odd entrada)
+  // Se odd subiu de 3% para 6% → aposta vale 2x o que pagou
+  const resaleMultiplier = exitOddCalc / openOddDec;
+  const resaleValue   = betAmt * resaleMultiplier;
+  const profitExit    = resaleValue - betAmt;
+  const multExit      = resaleValue / betAmt;
+  const roi           = (profitExit / betAmt * 100);
 
   const DAY_NAMES = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
   // Simulação: 10 semanas apostando $betAmt na abertura com odd de abertura avg
   const weeklyCost   = betAmt;
   const hitRate      = 0.15; // histórico: ~15% das semanas ETH sobe 10%+
-  const avgPayoffHit = betAmt / openOddDec * 0.7; // vende a 70% antes do vencimento
+  const avgPayoffHit = betAmt * (openOddDec * 5 / openOddDec) * 0.7; // odd sobe ~5x em semana de alta → revende 70% do ganho
   const expectedWeekly = avgPayoffHit * hitRate - weeklyCost * (1 - hitRate);
   const annualNet    = expectedWeekly * 52;
 
@@ -955,7 +1214,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
               </div>
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>VENDE POR</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: S.green, fontFamily: "'Space Grotesk'" }}>+${exitPayoff.toFixed(0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: S.green, fontFamily: "'Space Grotesk'" }}>+${resaleValue.toFixed(0)}</div>
               </div>
             </div>
             <div style={{ textAlign: "center", padding: "10px", borderRadius: 8,
