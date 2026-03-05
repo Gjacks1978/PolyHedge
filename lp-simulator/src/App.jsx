@@ -113,205 +113,6 @@ function Stat({ label, value, color, small }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB 1 — LP + PUT SIMULATOR
-// ═══════════════════════════════════════════════════════════════
-function TabPut({ liveEth, onSetAlert, requestAlertPermission }) {
-  const [ethPrice, setEthPrice] = useState(2000);
-  const [alertSet, setAlertSet] = useState(false);
-
-  // Auto-fill ETH price when live data arrives
-  useEffect(() => {
-    if (liveEth && !alertSet) setEthPrice(Math.round(liveEth));
-  }, [liveEth]);
-  const [capital, setCapital] = useState(4000);
-  const [rangeLo, setRangeLo] = useState(10);
-  const [rangeHi, setRangeHi] = useState(10);
-  const [apr, setApr] = useState(100);
-  const [strike, setStrike] = useState(1800);
-  const [contracts, setContracts] = useState(1);
-  const [expiry, setExpiry] = useState(45);
-  const [iv] = useState(0.85);
-
-  const Plo = ethPrice * (1 - rangeLo / 100);
-  const Phi = ethPrice * (1 + rangeHi / 100);
-  const feesDay = capital * (apr / 100) / 365;
-  const premium = useMemo(() => bsPut(ethPrice, strike, expiry, iv) * contracts, [ethPrice, strike, expiry, iv, contracts]);
-  const premiumPct = (premium / capital * 100).toFixed(2);
-  const breakEvenDays = premium / feesDay;
-
-  const SCENARIOS = [-50,-40,-30,-25,-20,-15,-12.5,-10,-5,0,5,10,12.5,20,25,30,40,50];
-
-  const rows = useMemo(() => SCENARIOS.map(pct => {
-    const P = ethPrice * (1 + pct / 100);
-    const lp = lpValue(P, ethPrice, Plo, Phi, capital);
-    const lpPnL = lp - capital;
-    const putPayoff = Math.max(0, (strike - P) * contracts);
-    const net = lpPnL + putPayoff - premium;
-    const coverage = putPayoff > 0 && lpPnL < 0 ? Math.min(100, putPayoff / Math.abs(lpPnL) * 100) : (putPayoff > 0 ? 100 : 0);
-    return { pct, P, lpPnL, putPayoff, net, coverage };
-  }), [ethPrice, capital, Plo, Phi, strike, contracts, premium]);
-
-  const coverageScenarios = rows.filter(r => [-12.5, -20, -30, -50].includes(r.pct));
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-      {/* Pool inputs */}
-      <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA POOL</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
-          <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-          <div>
-            <div className="label">RANGE INFERIOR</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="number" value={rangeLo} min={1} max={50} step={0.5}
-                onChange={e => setRangeLo(+e.target.value)} style={{ flex: 1 }} />
-              <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
-            </div>
-            <div style={{ fontSize: 10, color: S.red, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
-              → ${(ethPrice * (1 - rangeLo / 100)).toFixed(0)}
-            </div>
-          </div>
-          <div>
-            <div className="label">RANGE SUPERIOR</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="number" value={rangeHi} min={1} max={50} step={0.5}
-                onChange={e => setRangeHi(+e.target.value)} style={{ flex: 1 }} />
-              <span style={{ color: S.textDim, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>%</span>
-            </div>
-            <div style={{ fontSize: 10, color: S.green, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
-              → ${(ethPrice * (1 + rangeHi / 100)).toFixed(0)}
-            </div>
-          </div>
-          <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 14 }}>
-          <Stat label="LIMITE INFERIOR" value={`$${Plo.toFixed(0)}`} color={S.red} small />
-          <Stat label="RANGE ↓" value={`${rangeLo}%`} color={S.red} small />
-          <Stat label="ENTRADA ETH" value={`$${ethPrice}`} color={S.gold} small />
-          <Stat label="RANGE ↑" value={`${rangeHi}%`} color={S.green} small />
-          <Stat label="LIMITE SUPERIOR" value={`$${Phi.toFixed(0)}`} color={S.green} small />
-        </div>
-      </div>
-
-      {/* Put inputs */}
-      <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA PUT</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">STRIKE</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>${strike} ({((1 - strike / ethPrice) * 100).toFixed(1)}% abaixo)</span>
-            </div>
-            <input type="range" min={ethPrice * 0.5} max={ethPrice} step={50}
-              value={strike} onChange={e => setStrike(+e.target.value)} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: S.dim, marginTop: 3 }}>
-              <span>-50%</span><span>ATM</span>
-            </div>
-          </div>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">CONTRATOS</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>{contracts} ETH</span>
-            </div>
-            <input type="range" min={0.5} max={5} step={0.5}
-              value={contracts} onChange={e => setContracts(+e.target.value)} />
-          </div>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">VENCIMENTO</span>
-              <span style={{ color: S.gold, fontSize: 14, fontFamily: "'IBM Plex Mono'" }}>{expiry} dias</span>
-            </div>
-            <input type="range" min={7} max={90} step={7}
-              value={expiry} onChange={e => setExpiry(+e.target.value)} />
-          </div>
-        </div>
-
-        {/* Premium summary */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginTop: 16 }}>
-          <Stat label="PRÊMIO TOTAL"
-            value={`$${premium.toFixed(0)}`}
-            color={+premiumPct <= 2 ? S.green : +premiumPct <= 3 ? S.gold : S.red} small />
-          <Stat label="% DO CAPITAL" value={`${premiumPct}%`}
-            color={+premiumPct <= 2 ? S.green : S.gold} small />
-          <Stat label="BREAK-EVEN" value={`${breakEvenDays.toFixed(1)} dias`} color={S.blue} small />
-          <div className="card" style={{ textAlign: "center" }}>
-            <div className="label">TICKER DERIBIT</div>
-            <div style={{ fontSize: 12, color: S.purple, fontFamily: "'IBM Plex Mono'", fontWeight: 500, marginTop: 4 }}>
-              ETH-{expiry <= 30 ? "28MAR26" : expiry <= 60 ? "25APR26" : "27JUN26"}-{strike}-P
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Coverage cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-        {coverageScenarios.map(s => {
-          const cov = s.coverage.toFixed(0);
-          const covColor = +cov > 70 ? S.green : +cov > 40 ? S.gold : S.red;
-          return (
-            <div key={s.pct} className="card">
-              <div className="label">ETH {s.pct}%</div>
-              <div style={{ fontSize: 13, color: S.red, marginBottom: 4 }}>Perda LP: {fmtUSD(s.lpPnL)}</div>
-              <div style={{ fontSize: 13, color: S.green }}>Put paga: {s.putPayoff > 0 ? fmtUSD(s.putPayoff) : "—"}</div>
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${S.border}` }}>
-                <div className="label">COBERTURA</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: covColor }}>{cov}%</div>
-                <div style={{ fontSize: 12, color: col(s.net), marginTop: 2 }}>Líquido: {fmtUSD(s.net)}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Full table */}
-      <div className="card">
-        <div className="label" style={{ marginBottom: 12 }}>TABELA COMPLETA</div>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>CENÁRIO</th>
-              <th>ETH</th>
-              <th>P&L LP</th>
-              <th>PUT PAGA</th>
-              <th>PRÊMIO</th>
-              <th>P&L LÍQUIDO</th>
-              <th>SEM HEDGE</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(s => (
-              <tr key={s.pct} style={{ background: s.pct === 0 ? "#0f0f1a" : "" }}>
-                <td style={{ color: s.pct < 0 ? S.red : s.pct > 0 ? S.green : S.gold }}>
-                  ETH {s.pct > 0 ? "+" : ""}{s.pct}%
-                </td>
-                <td>${s.P.toFixed(0)}</td>
-                <td style={{ color: col(s.lpPnL) }}>{fmtUSD(s.lpPnL)}</td>
-                <td style={{ color: s.putPayoff > 0 ? S.green : S.dim }}>
-                  {s.putPayoff > 0 ? fmtUSD(s.putPayoff) : "—"}
-                </td>
-                <td style={{ color: S.red }}>-${premium.toFixed(0)}</td>
-                <td style={{ fontWeight: 600, color: col(s.net) }}>{fmtUSD(s.net)}</td>
-                <td style={{ color: col(s.lpPnL) }}>{fmtUSD(s.lpPnL)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ fontSize: 10, color: S.dim, marginTop: 10, fontFamily: "'IBM Plex Mono'" }}>
-          * P&L da LP não inclui fees · Prêmio calculado via Black-Scholes IV {(iv * 100).toFixed(0)}%aa
-        </div>
-      </div>
-
-      {/* Alert Setup */}
-      <AlertSetup ethPrice={ethPrice} plo={Plo} phi={Phi} capital={capital}
-        onSetAlert={onSetAlert} requestAlertPermission={requestAlertPermission}
-        alertSet={alertSet} setAlertSet={setAlertSet} />
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════
 // TAB 2 — POLYMARKET HEDGE
 // ═══════════════════════════════════════════════════════════════
 function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
@@ -690,6 +491,14 @@ function generatePath(scenario) {
       const base = 2000 + Math.sin(i * 0.18) * 70 + Math.sin(i * 0.42) * 35;
       return base + (seed(i + 700) - 0.5) * 28;
     });
+    // Cenário 9 — Gap de mercado (-25% overnight, sem chance de fechar no stop)
+    case 8: return Array.from({ length: 14 }, (_, i) => {
+      const seed = (n) => Math.sin(n * 9301 + 49297) * 0.5 + 0.5;
+      if (i === 0) return 2000;
+      if (i === 1) return 1500; // gap -25% overnight
+      if (i < 5) return 1500 + Math.sin(i * 0.9) * 30 + (seed(i + 800) - 0.5) * 20; // lateral abaixo
+      return 1500 + (i - 4) * 15 + (seed(i + 820) - 0.5) * 25; // lenta recuperação
+    });
     default: return [];
   }
 }
@@ -711,6 +520,8 @@ const SCENARIO_META = [
     desc: "ETH oscila ±8% dentro do range durante 3 semanas mas fecha próximo do preço de entrada. Fees boas pelas oscilações, mas cada aposta semanal virou pó. Vale a pena hedgear em mercados laterais voláteis?" },
   { title: "Cenário 8", subtitle: "2 meses no range — aposta toda semana?", color: "#34d399",
     desc: "ETH permanece no range por 8 semanas completas. 8 apostas consecutivas, todas expiram sem valor. As fees acumuladas justificam o custo total do hedge? Quando parar de apostar?" },
+  { title: "Cenário 9", subtitle: "Gap -25% overnight no fim de semana", color: "#ff4444",
+    desc: "ETH abre segunda com gap de -25% (notícia negativa no fim de semana). Você não consegue fechar no stop — sai muito abaixo do previsto. O short perpétuo amortece mas não cobre tudo. Qual o prejuízo real vs o simulado?" },
 ];
 
 function MiniChart({ path, color, exitIdx, exitType }) {
@@ -840,6 +651,27 @@ function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr =
       insight: `${chopWeeks} apostas expiram sem valor (-$${totalBets}). Fees: +$${chopFees.toFixed(0)}. Custo do hedge = ${hedgeEfficiency}% das fees. ${parseFloat(hedgeEfficiency) < 30 ? "✓ Razoável" : "⚠ Custo alto — considere só apostar com viés"}` };
     netPnL = netChopWithBet;
     netWithout = netChopWithout;
+  }
+
+  // Scenario 9: Gap — ETH drops 25% overnight, can't close at stop
+  if (scenarioIdx === 8) {
+    const gapPct    = 25;                         // gap size %
+    const shortCovers = gapPct * 0.6;             // short covers ~60% of gap move
+    const netExposure = gapPct - shortCovers;      // residual ~10%
+    const gapLoss   = capital * netExposure / 100;
+    const fees1day  = feesDay * 1;                // only 1 day of fees before gap
+    const netGap    = fees1day - gapLoss;
+    const vsSimulated = -(stop) - netGap;         // how much worse than stop
+    extra = {
+      gapPct, shortCovers, netExposure,
+      gapLoss: gapLoss.toFixed(0),
+      vsSimulated: Math.abs(vsSimulated).toFixed(0),
+      insight: `Gap de -${gapPct}% overnight. Short cobre ~${shortCovers}% → exposição residual ${netExposure}% = -$${gapLoss.toFixed(0)}. ${netExposure < 5 ? "✓ Short absorveu bem — perda controlada" : "⚠ Perda real significativamente maior que o stop simulado de $" + stop.toFixed(0)}`
+    };
+    netPnL    = fees1day - gapLoss - betAmount;
+    netWithout = fees1day - gapLoss;
+    exitDay   = 1;
+    exitType  = "lower";
   }
 
   // Scenario 8: 2 months in range — weekly bet question
@@ -1513,7 +1345,7 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
 // ═══════════════════════════════════════════════════════════════
 export default function App() {
   const [tab, setTab] = useState(0);
-  const tabs = ["Put como Seguro", "Aposta Polymarket", "4 Cenários"];
+  const tabs = ["Polymarket Hedge", "Cenários"];
 
   // ── Live ETH price ──
   const [liveEth, setLiveEth] = useState(null);
@@ -1646,9 +1478,8 @@ export default function App() {
 
       {/* Content */}
       <div style={{ padding: "0 28px 40px", maxWidth: 960, margin: "0 auto" }}>
-        {tab === 0 && <TabPut liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
-        {tab === 1 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
-        {tab === 2 && <TabScenarios />}
+        {tab === 0 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
+        {tab === 1 && <TabScenarios />}
       </div>
     </div>
   );
