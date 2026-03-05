@@ -378,7 +378,13 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
+      {/* Countdown to next market open */}
+      <WeeklyCountdown />
+
       <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} />
+
+      {/* Early entry strategy panel */}
+      <EarlyEntryPanel ethPrice={ethPrice} />
 
       {/* Pool + aposta inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -980,6 +986,317 @@ function TabScenarios() {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// EARLY ENTRY PANEL — Entrada na abertura com odd baixa
+// ═══════════════════════════════════════════════════════════════
+function EarlyEntryPanel({ ethPrice }) {
+  const [openOdd, setOpenOdd]         = useState(3);    // odd de abertura %
+  const [betAmt, setBetAmt]           = useState(20);   // valor apostado
+  const [ethMoveWed, setEthMoveWed]   = useState(4);    // movimento ETH até quarta %
+  const [exitDay, setExitDay]         = useState(3);    // dia de saída (1-7)
+  const [exitOdd, setExitOdd]         = useState(null); // calculado
+
+  // Strike alvo = ETH atual + 10%
+  const strikeTarget = ethPrice ? Math.round(ethPrice * 1.10 / 100) * 100 : 2200;
+  const openOddDec   = openOdd / 100;
+  const payoffMax    = betAmt / openOddDec;
+  const multMax      = payoffMax / betAmt;
+
+  // Odd no dia de saída — modelo simples baseado em movimento de preço e tempo
+  const exitOddCalc = useMemo(() => {
+    // Se ETH subiu X% em direção ao strike, qual a odd estimada?
+    const distToStrike = ((strikeTarget - ethPrice) / ethPrice * 100); // % faltando para o strike
+    const pctCovered   = Math.min(1, ethMoveWed / distToStrike);
+    // Mais próximo do strike = odd muito maior
+    const priceEffect  = openOddDec * (1 + pctCovered * 8); // 0% move = 1x, 100% move = 9x
+    // Time decay pelo dia de saída (7 dias = semana completa)
+    const timeDecay    = Math.max(0.05, (7 - exitDay) / 7);
+    const rawOdd       = Math.min(0.92, priceEffect * timeDecay);
+    return rawOdd;
+  }, [openOdd, ethMoveWed, exitDay, strikeTarget, ethPrice]);
+
+  const exitPayoff    = betAmt / exitOddCalc;
+  const profitExit    = exitPayoff - betAmt;
+  const multExit      = exitPayoff / betAmt;
+  const roi           = ((exitPayoff - betAmt) / betAmt * 100);
+
+  const DAY_NAMES = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+  // Simulação: 10 semanas apostando $betAmt na abertura com odd de abertura avg
+  const weeklyCost   = betAmt;
+  const hitRate      = 0.15; // histórico: ~15% das semanas ETH sobe 10%+
+  const avgPayoffHit = betAmt / openOddDec * 0.7; // vende a 70% antes do vencimento
+  const expectedWeekly = avgPayoffHit * hitRate - weeklyCost * (1 - hitRate);
+  const annualNet    = expectedWeekly * 52;
+
+  return (
+    <div className="card" style={{ borderColor: S.gold + "60" }}>
+      <div style={{ marginBottom: 14 }}>
+        <div className="label" style={{ color: S.gold }}>⚡ ENTRADA NA ABERTURA — ESTRATÉGIA DE ODD BAIXA</div>
+        <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 4 }}>
+          Domingo 21h Brasília · Strike +10% · Mercado frio · Máxima assimetria
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+        {/* Inputs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">ODD DE ABERTURA</span>
+              <span style={{ color: S.green, fontSize: 14, fontFamily: "'IBM Plex Mono'", fontWeight: 700 }}>
+                {openOdd}% → paga {multMax.toFixed(0)}x
+              </span>
+            </div>
+            <input type="range" min={1} max={15} step={0.5}
+              value={openOdd} onChange={e => setOpenOdd(+e.target.value)} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+              <span>1% (100x)</span><span>5% (20x)</span><span>10% (10x)</span><span>15% (7x)</span>
+            </div>
+            <div style={{ fontSize: 11, marginTop: 4, fontFamily: "'Inter'",
+              color: openOdd <= 3 ? S.green : openOdd <= 7 ? S.gold : S.textDim }}>
+              {openOdd <= 2 ? "🔥 Assimetria extrema — raro mas acontece" :
+               openOdd <= 5 ? "✅ Zona ideal — melhor relação risco/retorno" :
+               openOdd <= 10 ? "⚠ Razoável — ETH já tem algum momentum" :
+               "⛔ Odds altas — não é entrada de abertura"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">VALOR APOSTADO</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>${betAmt}</span>
+            </div>
+            <input type="range" min={5} max={100} step={5}
+              value={betAmt} onChange={e => setBetAmt(+e.target.value)} />
+          </div>
+
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">ETH SOBE ATÉ O DIA DE SAÍDA</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>+{ethMoveWed}%</span>
+            </div>
+            <input type="range" min={0} max={15} step={0.5}
+              value={ethMoveWed} onChange={e => setEthMoveWed(+e.target.value)} />
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+              Strike: ${strikeTarget.toLocaleString()} · ETH atual: ${ethPrice?.toLocaleString() || "—"} · falta {((strikeTarget/ethPrice-1)*100).toFixed(1)}%
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">DIA DE SAÍDA (VENDE A APOSTA)</span>
+              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{DAY_NAMES[exitDay]}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[2,3,4,5,6].map(d => (
+                <span key={d} className="pill"
+                  style={{ background: exitDay===d ? S.gold : S.border,
+                    color: exitDay===d ? "#000" : S.textDim, fontSize: 11 }}
+                  onClick={() => setExitDay(d)}>
+                  {DAY_NAMES[d]}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* Main payoff card */}
+          <div style={{ padding: 16, background: "#090914", borderRadius: 10,
+            border: `1px solid ${profitExit > 0 ? S.green : S.border}` }}>
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginBottom: 8 }}>
+              RESULTADO ESPERADO — SAÍDA {DAY_NAMES[exitDay].toUpperCase()}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>APOSTA</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: S.red, fontFamily: "'Space Grotesk'" }}>-${betAmt}</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>VENDE POR</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: S.green, fontFamily: "'Space Grotesk'" }}>+${exitPayoff.toFixed(0)}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "center", padding: "10px", borderRadius: 8,
+              background: profitExit > 0 ? S.green + "15" : S.red + "15",
+              border: `1px solid ${profitExit > 0 ? S.green : S.red}30` }}>
+              <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>LUCRO LÍQUIDO</div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Space Grotesk'",
+                color: profitExit > 0 ? S.green : S.red }}>
+                {profitExit >= 0 ? "+" : ""}${profitExit.toFixed(0)}
+              </div>
+              <div style={{ fontSize: 12, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                {multExit.toFixed(1)}x · ROI {roi.toFixed(0)}%
+              </div>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ padding: "10px 8px", background: "#090914", borderRadius: 8, textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>SE VENCER (100%)</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: S.green, fontFamily: "'Space Grotesk'" }}>
+                +${(payoffMax - betAmt).toFixed(0)}
+              </div>
+              <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>{multMax.toFixed(0)}x</div>
+            </div>
+            <div style={{ padding: "10px 8px", background: "#090914", borderRadius: 8, textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>ODD NA SAÍDA EST.</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: S.gold, fontFamily: "'Space Grotesk'" }}>
+                {(exitOddCalc * 100).toFixed(1)}%
+              </div>
+              <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>
+                vs {openOdd}% abertura
+              </div>
+            </div>
+          </div>
+
+          {/* Expected value over 10 weeks */}
+          <div style={{ padding: "12px 14px", background: S.gold + "10", borderRadius: 8,
+            border: `1px solid ${S.gold}30` }}>
+            <div style={{ fontSize: 10, color: S.gold, fontFamily: "'IBM Plex Mono'", marginBottom: 6 }}>
+              VALOR ESPERADO — 10 SEMANAS (histórico ~15% hit rate)
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>CUSTO</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: S.red, fontFamily: "'Space Grotesk'" }}>-${(weeklyCost * 10).toFixed(0)}</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>GANHO ESPERADO</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: S.green, fontFamily: "'Space Grotesk'" }}>+${(avgPayoffHit * hitRate * 10).toFixed(0)}</div>
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>LÍQUIDO</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: annualNet/52*10 >= 0 ? S.green : S.red, fontFamily: "'Space Grotesk'" }}>
+                  {annualNet/52*10 >= 0 ? "+" : ""}${(annualNet/52*10).toFixed(0)}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'Inter'", marginTop: 8 }}>
+              💡 Com odd de abertura baixa e saída antecipada, 1 acerto em 10 semanas cobre as outras 9.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WEEKLY COUNTDOWN COMPONENT
+// ═══════════════════════════════════════════════════════════════
+function WeeklyCountdown() {
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [phase, setPhase]       = useState(""); // "open_soon" | "open_now" | "midweek" | "closing"
+
+  useEffect(() => {
+    function calc() {
+      // Market opens Monday 00:00 UTC = Sunday 21:00 Brasília (UTC-3)
+      // Market closes Sunday 04:00 UTC = Saturday 01:00 Brasília
+      const now = new Date();
+      const nowUTC = new Date(now.toISOString());
+      const day = nowUTC.getUTCDay(); // 0=Sun 1=Mon ... 6=Sat
+      const h   = nowUTC.getUTCHours();
+      const m   = nowUTC.getUTCMinutes();
+      const s   = nowUTC.getUTCSeconds();
+      const totalSecsToday = h * 3600 + m * 60 + s;
+
+      // Next Monday 00:00 UTC
+      let daysToMon = (8 - day) % 7;
+      if (daysToMon === 0 && totalSecsToday > 3600) daysToMon = 7; // already past open
+      if (day === 1 && totalSecsToday < 21600) daysToMon = 0; // still Monday early
+
+      const secsTilOpen = daysToMon * 86400 - totalSecsToday;
+
+      // Phases
+      if (day === 1 && h < 3) {
+        setPhase("open_now");
+      } else if (secsTilOpen <= 7200 && secsTilOpen > 0) {
+        setPhase("open_soon");
+      } else if (day >= 1 && day <= 3) {
+        setPhase("midweek");
+      } else if (day >= 5 || (day === 0 && h >= 0)) {
+        setPhase("closing");
+      } else {
+        setPhase("waiting");
+      }
+
+      const secs = Math.abs(secsTilOpen);
+      const dd   = Math.floor(secs / 86400);
+      const hh   = Math.floor((secs % 86400) / 3600);
+      const mm   = Math.floor((secs % 3600) / 60);
+      const ss   = secs % 60;
+      setTimeLeft({ dd, hh, mm, ss, secsTilOpen });
+    }
+    calc();
+    const iv = setInterval(calc, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  if (!timeLeft) return null;
+
+  const phaseConfig = {
+    open_now:  { color: S.green,  icon: "🟢", label: "MERCADO ABERTO AGORA",        sub: "Odd de abertura — melhor momento para entrar!" },
+    open_soon: { color: S.green,  icon: "⚡", label: "ABRE EM BREVE",               sub: "Prepare-se — odds baixíssimas em minutos" },
+    midweek:   { color: S.gold,   icon: "📊", label: "SEMANA EM CURSO",             sub: "Mercado aberto — odds já precificam movimento da semana" },
+    closing:   { color: S.red,    icon: "⏳", label: "PRÓXIMA ABERTURA",            sub: "Aguarde a segunda para pegar odds de abertura" },
+    waiting:   { color: S.textDim,icon: "🕐", label: "PRÓXIMA ABERTURA",            sub: "Segunda-feira 00:00 UTC · 21h domingo (Brasília)" },
+  };
+  const cfg = phaseConfig[phase] || phaseConfig.waiting;
+
+  return (
+    <div className="card" style={{ borderColor: cfg.color + "60", marginBottom: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div className="label" style={{ color: cfg.color }}>
+            {cfg.icon} {cfg.label}
+          </div>
+          <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 3 }}>
+            {cfg.sub}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          {phase === "open_now" ? (
+            <div style={{ fontSize: 22, fontWeight: 800, color: S.green, fontFamily: "'Space Grotesk'" }}>
+              AGORA ✓
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+              {timeLeft.dd > 0 && (
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: cfg.color, fontFamily: "'Space Grotesk'", lineHeight: 1 }}>{timeLeft.dd}</div>
+                  <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>dias</div>
+                </div>
+              )}
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: cfg.color, fontFamily: "'Space Grotesk'", lineHeight: 1 }}>{String(timeLeft.hh).padStart(2,"0")}</div>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>horas</div>
+              </div>
+              <div style={{ fontSize: 18, color: cfg.color, fontWeight: 800, lineHeight: 1.2 }}>:</div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: cfg.color, fontFamily: "'Space Grotesk'", lineHeight: 1 }}>{String(timeLeft.mm).padStart(2,"0")}</div>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>min</div>
+              </div>
+              <div style={{ fontSize: 18, color: cfg.color, fontWeight: 800, lineHeight: 1.2 }}>:</div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: cfg.color, fontFamily: "'Space Grotesk'", lineHeight: 1 }}>{String(timeLeft.ss).padStart(2,"0")}</div>
+                <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>seg</div>
+              </div>
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 4, textAlign: "right" }}>
+            Segunda 00:00 UTC · Dom 21h Brasília
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ALERT SETUP COMPONENT
