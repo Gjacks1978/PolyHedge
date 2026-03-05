@@ -1237,18 +1237,29 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
                 </div>
               </div>
             </div>
-            <div style={{ textAlign: "center", padding: "10px", borderRadius: 8,
-              background: profitExit > 0 ? S.green + "15" : S.red + "15",
-              border: `1px solid ${profitExit > 0 ? S.green : S.red}30` }}>
-              <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>LUCRO LÍQUIDO</div>
-              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Space Grotesk'",
-                color: profitExit > 0 ? S.green : S.red }}>
-                {profitExit >= 0 ? "+" : ""}${profitExit.toFixed(0)}
-              </div>
-              <div style={{ fontSize: 12, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
-                {multExit.toFixed(1)}x · ROI {roi.toFixed(0)}%
-              </div>
-            </div>
+            {(() => {
+              const touched    = ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100;
+              const netVenc    = touched ? payoffMax - betAmt : -betAmt;
+              const displayNet = exitDay === 7 ? netVenc : profitExit;
+              const displayMul = exitDay === 7 ? (touched ? multMax : 0) : multExit;
+              return (
+                <div style={{ textAlign: "center", padding: "10px", borderRadius: 8,
+                  background: displayNet > 0 ? S.green + "15" : S.red + "15",
+                  border: `1px solid ${displayNet > 0 ? S.green : S.red}30` }}>
+                  <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>LUCRO LÍQUIDO</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "'Space Grotesk'",
+                    color: displayNet > 0 ? S.green : S.red }}>
+                    {displayNet >= 0 ? "+" : ""}${displayNet.toFixed(0)}
+                  </div>
+                  <div style={{ fontSize: 12, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                    {displayMul.toFixed(1)}x · ROI {(displayNet / betAmt * 100).toFixed(0)}%
+                  </div>
+                  {exitDay === 7 && <div style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter'", marginTop: 4 }}>
+                    {touched ? "✅ ETH tocou o strike — aposta venceu" : "❌ ETH não tocou o strike — aposta expira"}
+                  </div>}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Stats row */}
