@@ -1099,30 +1099,36 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
 
   // Odd no dia de saída — modelo simples baseado em movimento de preço e tempo
   const exitOddCalc = useMemo(() => {
-    // Odd de saída = abertura ajustada por movimento de preço + time decay
-    const distToStrike = Math.max(1, (strikeTarget - ethPrice) / ethPrice * 100);
-    const pctCovered   = Math.min(0.99, ethMoveWed / distToStrike);
-    // Quanto mais próximo do strike, maior a odd (mercado reprecia)
-    const priceEffect  = openOddDec * (1 + pctCovered * 7);
-    // Time decay: menos dias restantes = odd menor (menos tempo para acontecer)
-    const timeDecay    = Math.max(0.05, (7 - exitDay) / 7);
-    return Math.min(0.92, priceEffect * timeDecay);
+    // Quanto % do caminho até o strike ETH percorreu?
+    const distToStrike = Math.max(0.5, (strikeTarget - ethPrice) / ethPrice * 100);
+    const pctCovered   = Math.min(0.98, ethMoveWed / distToStrike);
+    // Odd de saída: sobe exponencialmente conforme se aproxima do strike
+    // 0% coberto → odd = openOdd (sem movimento)
+    // 50% coberto → odd ~5x maior
+    // 95% coberto → odd ~40x maior (quase no strike)
+    const priceBoost   = Math.pow(1 + pctCovered * 3, 2.5);
+    // Time decay: menos dias restantes = ligeiramente menor
+    // (mas price effect domina quando ETH se move)
+    const timeDecay    = Math.max(0.3, (7 - exitDay) / 7);
+    const rawOdd       = Math.min(0.92, openOddDec * priceBoost * timeDecay);
+    return Math.max(openOddDec * 0.05, rawOdd); // mínimo: 5% da odd original
   }, [openOdd, ethMoveWed, exitDay, strikeTarget, ethPrice]);
 
-  // Valor de revenda = custo original × (odd saída / odd entrada)
-  // Se odd subiu de 3% para 6% → aposta vale 2x o que pagou
-  const resaleMultiplier = exitOddCalc / openOddDec;
-  const resaleValue   = betAmt * resaleMultiplier;
-  const profitExit    = resaleValue - betAmt;
-  const multExit      = resaleValue / betAmt;
-  const roi           = (profitExit / betAmt * 100);
+  // Valor de revenda: aposta comprada a openOdd%, agora sendo negociada a exitOddCalc%
+  // No Polymarket, se você comprou "sim" a 1%, e agora está 10%, cada token que
+  // você pagou $0.01 agora vale $0.10 → multiplicou 10x
+  const resaleMultiplier = exitOddCalc / openOddDec;          // ex: 10%/1% = 10x
+  const resaleValue      = betAmt * resaleMultiplier;          // $20 × 10 = $200
+  const profitExit       = resaleValue - betAmt;
+  const multExit         = resaleMultiplier;
+  const roi              = (profitExit / betAmt * 100);
 
   const DAY_NAMES = ["", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
   // Simulação: 10 semanas apostando $betAmt na abertura com odd de abertura avg
   const weeklyCost   = betAmt;
   const hitRate      = 0.15; // histórico: ~15% das semanas ETH sobe 10%+
-  const avgPayoffHit = betAmt * (openOddDec * 5 / openOddDec) * 0.7; // odd sobe ~5x em semana de alta → revende 70% do ganho
+  const avgPayoffHit = betAmt * 8 * 0.7; // odd sobe ~8x em semana de alta (ex: 3%→24%) → revende por 70% do ganho
   const expectedWeekly = avgPayoffHit * hitRate - weeklyCost * (1 - hitRate);
   const annualNet    = expectedWeekly * 52;
 
