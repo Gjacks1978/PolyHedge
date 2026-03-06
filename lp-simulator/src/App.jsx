@@ -1093,6 +1093,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
 
   // Strike alvo = ETH atual + 10%
   const strikeTarget = ethPrice ? Math.round(ethPrice * 1.10 / 100) * 100 : 2200;
+  const distToStrike = Math.max(0.5, (strikeTarget - ethPrice) / ethPrice * 100);
   const openOddDec   = openOdd / 100;
   const payoffMax    = betAmt / openOddDec;
   const multMax      = payoffMax / betAmt;
@@ -1227,18 +1228,18 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
               </div>
               <div style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
-                  {exitDay === 7 ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? "PAYOFF MÁXIMO" : "EXPIRA SEM VALOR") : "VENDE POR"}
+                  {exitDay === 7 ? (ethMoveWed >= distToStrike ? "PAYOFF MÁXIMO" : "EXPIRA SEM VALOR") : "VENDE POR"}
                 </div>
                 <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "'Space Grotesk'",
-                  color: exitDay === 7 ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? S.green : S.red) : S.green }}>
+                  color: exitDay === 7 ? (ethMoveWed >= distToStrike ? S.green : S.red) : S.green }}>
                   {exitDay === 7
-                    ? (ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100 ? `+$${payoffMax.toFixed(0)}` : "$0")
+                    ? (ethMoveWed >= distToStrike ? `+$${payoffMax.toFixed(0)}` : "$0")
                     : `+$${resaleValue.toFixed(0)}`}
                 </div>
               </div>
             </div>
             {(() => {
-              const touched    = ethMoveWed >= (strikeTarget - ethPrice) / ethPrice * 100;
+              const touched    = ethMoveWed >= distToStrike;
               const netVenc    = touched ? payoffMax - betAmt : -betAmt;
               const displayNet = exitDay === 7 ? netVenc : profitExit;
               const displayMul = exitDay === 7 ? (touched ? multMax : 0) : multExit;
@@ -1640,7 +1641,7 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
 // ═══════════════════════════════════════════════════════════════
 export default function App() {
   const [tab, setTab] = useState(0);
-  const tabs = ["Polymarket Hedge", "Cenários"];
+  const tabs = ["Polymarket Hedge", "Cenários", "Manutenção do Hedge"];
 
   // ── Live ETH price ──
   const [liveEth, setLiveEth] = useState(null);
@@ -1775,6 +1776,250 @@ export default function App() {
       <div style={{ padding: "0 28px 40px", maxWidth: 960, margin: "0 auto" }}>
         {tab === 0 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
         {tab === 1 && <TabScenarios />}
+        {tab === 2 && <TabMaintenance />}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB 3 — MANUTENÇÃO DO HEDGE
+// ═══════════════════════════════════════════════════════════════
+function TabMaintenance() {
+  const [capital,  setCapital]  = useState(4000);
+  const [apr,      setApr]      = useState(100);
+  const [stopPct,  setStopPct]  = useState(2);
+  const [weeks,    setWeeks]    = useState(8);
+  const [baseOdd,  setBaseOdd]  = useState(3);   // odd padrão %
+
+  // Per-week overrides: { oddOverride, extraBet }
+  const [weekData, setWeekData] = useState(
+    Array.from({ length: 12 }, () => ({ oddOverride: null, extraBet: 0 }))
+  );
+
+  const feesDay  = capital * (apr / 100) / 365;
+  const feesWeek = feesDay * 7;
+  const stop     = capital * stopPct / 100;
+
+  const updateWeek = (i, key, val) => {
+    setWeekData(prev => {
+      const next = [...prev];
+      next[i] = { ...next[i], [key]: val };
+      return next;
+    });
+  };
+
+  // Compute cumulative state per week
+  const rows = useMemo(() => {
+    let feesAcc = 0;
+    return Array.from({ length: weeks }, (_, i) => {
+      const residual    = Math.max(0, stop - feesAcc);          // stop ainda não coberto
+      const wd          = weekData[i] || { oddOverride: null, extraBet: 0 };
+      const odd         = (wd.oddOverride ?? baseOdd) / 100;
+      const coverBet    = residual > 0 ? residual * odd : 0;    // aposta mínima para cobrir residual
+      const extraBet    = wd.extraBet || 0;
+      const totalBet    = coverBet + extraBet;
+      const payoffCover = coverBet / odd;
+      const payoffExtra = extraBet / odd;
+      const payoffTotal = totalBet / odd;
+
+      feesAcc += feesWeek;
+
+      const netIfRange  = feesWeek - totalBet;                  // fees da semana menos aposta
+      const netIfTop    = feesWeek - stop + payoffTotal;        // sai pelo topo: fees - stop + payoff
+      const netIfBot    = feesWeek - stop - totalBet;           // sai pelo fundo: fees - stop - aposta
+
+      return {
+        week: i + 1,
+        feesAcc,
+        residual,
+        odd,
+        coverBet,
+        extraBet,
+        totalBet,
+        payoffTotal,
+        netIfRange,
+        netIfTop,
+        netIfBot,
+        isFullyCovered: residual <= 0,
+        isOpportunistic: odd <= 0.05 && extraBet > 0,
+      };
+    });
+  }, [capital, apr, stopPct, weeks, baseOdd, weekData, feesWeek, stop]);
+
+  const totalBetCost   = rows.reduce((s, r) => s + r.totalBet, 0);
+  const totalFees      = rows[rows.length - 1]?.feesAcc || 0;
+  const breakEvenWeek  = rows.findIndex(r => r.feesAcc >= stop) + 1;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      {/* Global params */}
+      <div className="card">
+        <div className="label" style={{ marginBottom: 14 }}>PARÂMETROS DA POSIÇÃO</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+          <Field label="CAPITAL"   value={capital}  onChange={setCapital}  prefix="$" min={500}  max={50000} step={100} />
+          <Field label="APR"       value={apr}      onChange={setApr}      suffix="%" min={10}   max={500}   step={5} />
+          <Field label="STOP %"    value={stopPct}  onChange={setStopPct}  suffix="%" min={0.5}  max={5}     step={0.1} />
+          <Field label="SEMANAS"   value={weeks}    onChange={w => { setWeeks(w); setWeekData(Array.from({ length: 12 }, () => ({ oddOverride: null, extraBet: 0 }))); }} min={2} max={12} step={1} />
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span className="label">ODD BASE</span>
+              <span style={{ color: S.gold, fontFamily: "'IBM Plex Mono'", fontSize: 12 }}>{baseOdd}%</span>
+            </div>
+            <input type="range" min={1} max={15} step={0.5} value={baseOdd} onChange={e => setBaseOdd(+e.target.value)} />
+          </div>
+        </div>
+
+        {/* Summary stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 16 }}>
+          {[
+            { label: "FEES TOTAIS",       value: `+$${totalFees.toFixed(0)}`,      color: S.green },
+            { label: "CUSTO APOSTAS",     value: `-$${totalBetCost.toFixed(0)}`,   color: S.red },
+            { label: "BREAK-EVEN",        value: `semana ${breakEvenWeek || "—"}`, color: S.gold },
+            { label: "STOP",              value: `$${stop.toFixed(0)}`,            color: S.textDim },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: "center", padding: "10px", background: "#090914", borderRadius: 8 }}>
+              <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>{s.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: s.color, fontFamily: "'Space Grotesk'", marginTop: 4 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Visual timeline */}
+      <div className="card">
+        <div className="label" style={{ marginBottom: 14 }}>EVOLUÇÃO DO HEDGE — SEMANA A SEMANA</div>
+        <div style={{ position: "relative", height: 120, marginBottom: 8 }}>
+          {rows.map((r, i) => {
+            const w    = 100 / rows.length;
+            const feeH = Math.min(100, (r.feesAcc / (stop * 1.5)) * 100);
+            const stopH = Math.max(0, 100 - feeH);
+            return (
+              <div key={i} style={{ position: "absolute", left: `${i * w}%`, width: `${w - 0.5}%`,
+                height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                {/* Fee bar */}
+                <div style={{ width: "100%", height: `${feeH}%`, background: S.green + "60",
+                  borderRadius: "3px 3px 0 0", position: "relative" }}>
+                  {r.totalBet > 0 && (
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0,
+                      height: `${Math.min(100, r.totalBet / feesWeek * 100)}%`,
+                      background: r.isOpportunistic ? S.gold + "90" : S.red + "70",
+                      borderRadius: "0 0 3px 3px" }} />
+                  )}
+                </div>
+                <div style={{ fontSize: 8, color: S.dim, fontFamily: "'IBM Plex Mono'",
+                  textAlign: "center", marginTop: 3 }}>S{r.week}</div>
+              </div>
+            );
+          })}
+          {/* Stop line */}
+          {(() => {
+            const stopY = 100 - Math.min(100, (stop / (stop * 1.5)) * 100);
+            return (
+              <div style={{ position: "absolute", top: `${stopY}%`, left: 0, right: 0,
+                borderTop: `1px dashed ${S.red}80`, pointerEvents: "none" }}>
+                <span style={{ fontSize: 8, color: S.red, fontFamily: "'IBM Plex Mono'",
+                  background: "#0e0e1a", padding: "0 4px" }}>stop ${stop.toFixed(0)}</span>
+              </div>
+            );
+          })()}
+        </div>
+        <div style={{ display: "flex", gap: 16, fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
+          <span><span style={{ color: S.green }}>█</span> fees acumuladas</span>
+          <span><span style={{ color: S.red }}>█</span> cobertura residual</span>
+          <span><span style={{ color: S.gold }}>█</span> aposta oportunista</span>
+        </div>
+      </div>
+
+      {/* Week-by-week table */}
+      <div className="card">
+        <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO POR SEMANA</div>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}>SEM</th>
+                <th>FEES ACC</th>
+                <th>RESIDUAL</th>
+                <th>ODD</th>
+                <th>COB. MIN</th>
+                <th>EXTRA 🎯</th>
+                <th>TOTAL BET</th>
+                <th>PAYOFF</th>
+                <th>SE RANGE</th>
+                <th>SE TOPO ↑</th>
+                <th>SE FUNDO ↓</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} style={{ opacity: r.isFullyCovered && r.extraBet === 0 ? 0.5 : 1 }}>
+                  <td>
+                    <span style={{ color: r.isFullyCovered ? S.green : S.gold,
+                      fontWeight: 600, fontFamily: "'IBM Plex Mono'" }}>
+                      {r.isFullyCovered ? "✓" : r.week}
+                    </span>
+                    {!r.isFullyCovered && <span style={{ color: S.dim }}> S{r.week}</span>}
+                  </td>
+                  <td style={{ color: S.green }}>+${r.feesAcc.toFixed(0)}</td>
+                  <td style={{ color: r.residual <= 0 ? S.green : S.red }}>
+                    {r.residual <= 0 ? "coberto ✓" : `$${r.residual.toFixed(0)}`}
+                  </td>
+                  {/* Odd override input */}
+                  <td>
+                    <input type="number" value={weekData[i]?.oddOverride ?? baseOdd}
+                      min={1} max={50} step={0.5}
+                      onChange={e => updateWeek(i, "oddOverride", +e.target.value)}
+                      style={{ width: 52, fontSize: 11, padding: "3px 6px",
+                        background: weekData[i]?.oddOverride ? S.gold + "20" : "#090914",
+                        border: `1px solid ${weekData[i]?.oddOverride ? S.gold : S.border}`,
+                        color: S.text, borderRadius: 4, fontFamily: "'IBM Plex Mono'" }} />
+                    <span style={{ color: S.dim, fontSize: 10, marginLeft: 2 }}>%</span>
+                  </td>
+                  <td style={{ color: S.textDim }}>${r.coverBet.toFixed(2)}</td>
+                  {/* Extra bet input */}
+                  <td>
+                    <input type="number" value={weekData[i]?.extraBet || 0}
+                      min={0} max={200} step={5}
+                      onChange={e => updateWeek(i, "extraBet", +e.target.value)}
+                      style={{ width: 56, fontSize: 11, padding: "3px 6px",
+                        background: weekData[i]?.extraBet > 0 ? S.gold + "20" : "#090914",
+                        border: `1px solid ${weekData[i]?.extraBet > 0 ? S.gold : S.border}`,
+                        color: S.text, borderRadius: 4, fontFamily: "'IBM Plex Mono'" }} />
+                    <span style={{ color: S.dim, fontSize: 10, marginLeft: 2 }}>$</span>
+                  </td>
+                  <td style={{ color: r.totalBet > 0 ? S.red : S.dim }}>
+                    {r.totalBet > 0 ? `-$${r.totalBet.toFixed(2)}` : "—"}
+                  </td>
+                  <td style={{ color: S.green }}>
+                    {r.payoffTotal > 0 ? `+$${r.payoffTotal.toFixed(0)}` : "—"}
+                  </td>
+                  <td style={{ color: r.netIfRange >= 0 ? S.green : S.red }}>
+                    {r.netIfRange >= 0 ? "+" : ""}${r.netIfRange.toFixed(0)}
+                  </td>
+                  <td style={{ color: r.netIfTop >= 0 ? S.green : S.red, fontWeight: 600 }}>
+                    {r.netIfTop >= 0 ? "+" : ""}${r.netIfTop.toFixed(0)}
+                  </td>
+                  <td style={{ color: r.netIfBot >= 0 ? S.green : S.red }}>
+                    {r.netIfBot >= 0 ? "+" : ""}${r.netIfBot.toFixed(0)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 10, color: S.dim, marginTop: 10, fontFamily: "'IBM Plex Mono'" }}>
+          COB. MIN = aposta mínima para cobrir o stop residual · EXTRA = aposta oportunista manual · ODD editável por semana
+        </div>
+      </div>
+
+      {/* Insight */}
+      <div className="insight">
+        <strong style={{ color: S.gold }}>Lógica de manutenção:</strong>
+        {" "}A cobertura mínima decai automaticamente conforme as fees absorvem o stop.
+        {breakEvenWeek > 0 && <> A partir da <strong style={{ color: S.green }}>semana {breakEvenWeek}</strong>, o stop está 100% coberto pelas fees — apostas passam a ser puramente oportunistas.</>}
+        {" "}Use a coluna <strong style={{ color: S.gold }}>EXTRA</strong> nas semanas com odd baixa para adicionar exposição assimétrica sem comprometer a proteção.
       </div>
     </div>
   );
