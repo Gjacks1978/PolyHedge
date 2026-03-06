@@ -123,6 +123,8 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   const [apr, setApr] = useState(100);
   const [stopPct, setStopPct] = useState(2);
   const [betOdd, setBetOdd] = useState(0.15);
+  const [downOdd, setDownOdd] = useState(0.02);
+  const [downBet, setDownBet] = useState(5);
   const [alertSet, setAlertSet] = useState(false);
 
   // Auto-fill ETH price when live data arrives
@@ -182,10 +184,13 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       {/* Countdown to next market open */}
       <WeeklyCountdown />
 
-      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} />
+      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} onSelectDownOdd={odd => setDownOdd(odd)} />
 
-      {/* Early entry strategy panel */}
-      <EarlyEntryPanel ethPrice={ethPrice} betOdd={betOdd} setBetOdd={setBetOdd} />
+      {/* Early entry panels — side by side */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <EarlyEntryPanel ethPrice={ethPrice} betOdd={betOdd} setBetOdd={setBetOdd} />
+        <DownsidePanel ethPrice={ethPrice} rangePct={rangeLo} downOdd={downOdd} setDownOdd={setDownOdd} downBet={downBet} setDownBet={setDownBet} stopPct={stopPct} capital={capital} feesDay={feesDay} />
+      </div>
 
       {/* Pool + aposta inputs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -956,6 +961,8 @@ function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr =
 
 function TabScenarios() {
   const [betOdd, setBetOdd] = useState(0.15);
+  const [downOdd, setDownOdd] = useState(0.02);
+  const [downBet, setDownBet] = useState(5);
   const [betAmount, setBetAmount] = useState(20);
   const [capital, setCapital] = useState(4000);
   const [apr, setApr] = useState(100);
@@ -1075,6 +1082,120 @@ function TabScenarios() {
   );
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════
+// DOWNSIDE PANEL
+// ═══════════════════════════════════════════════════════════════
+function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDownBet, stopPct, capital, feesDay }) {
+  const strikeTarget  = ethPrice ? Math.round(ethPrice * (1 - rangePct / 100) / 100) * 100 : 1800;
+  const downOddDec    = downOdd / 100;
+  const payoffMax     = downBet / downOddDec;
+  const multMax       = payoffMax / downBet;
+  const stop          = capital * stopPct / 100;
+  // Short perpétuo cobre ~60% do movimento downside
+  const shortCovers   = stop * 0.60;
+  const residual      = Math.max(0, stop - shortCovers);
+  const minBetNeeded  = residual * downOddDec; // aposta mínima para cobrir residual
+  const isOptimal     = downBet >= minBetNeeded;
+  const netIfFund     = payoffMax - stop;
+
+  return (
+    <div className="card" style={{ borderColor: S.red + "40" }}>
+      <div style={{ marginBottom: 14 }}>
+        <div className="label" style={{ color: S.red }}>⬇ HEDGE DOWNSIDE</div>
+        <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 4 }}>
+          Strike -10% · Short cobre ~60% · aposta cobre o resíduo
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Strike info */}
+        <div style={{ padding: "10px 12px", background: "#090914", borderRadius: 8,
+          border: `1px solid ${S.red}30` }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>STRIKE ALVO</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: S.red, fontFamily: "'Space Grotesk'" }}>
+              ${strikeTarget.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>STOP RESIDUAL</span>
+            <span style={{ fontSize: 13, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>
+              ${residual.toFixed(0)} <span style={{ color: S.dim, fontSize: 10 }}>(após short)</span>
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+            <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>APOSTA MÍN.</span>
+            <span style={{ fontSize: 13, color: isOptimal ? S.green : S.gold, fontFamily: "'IBM Plex Mono'" }}>
+              ${minBetNeeded.toFixed(2)} {isOptimal ? "✓" : "⚠"}
+            </span>
+          </div>
+        </div>
+
+        {/* Odd slider */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span className="label">ODD DOWNSIDE</span>
+            <span style={{ color: S.red, fontSize: 14, fontFamily: "'IBM Plex Mono'", fontWeight: 700 }}>
+              {downOdd}% → {multMax.toFixed(0)}x
+            </span>
+          </div>
+          <input type="range" min={0.5} max={15} step={0.5}
+            value={downOdd} onChange={e => setDownOdd(+e.target.value)} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9,
+            color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+            <span>0.5% (200x)</span><span>5% (20x)</span><span>15% (7x)</span>
+          </div>
+        </div>
+
+        {/* Bet amount */}
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span className="label">VALOR APOSTADO</span>
+            <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>${downBet}</span>
+          </div>
+          <input type="range" min={1} max={50} step={1}
+            value={downBet} onChange={e => setDownBet(+e.target.value)} />
+        </div>
+
+        {/* Result */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ padding: "12px 10px", background: "#090914", borderRadius: 8, textAlign: "center",
+            border: `1px solid ${netIfFund >= 0 ? S.green : S.red}30` }}>
+            <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>SE TOCAR O FUNDO</div>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Grotesk'",
+              color: netIfFund >= 0 ? S.green : S.red, marginTop: 4 }}>
+              {netIfFund >= 0 ? "+" : ""}${netIfFund.toFixed(0)}
+            </div>
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+              payoff ${payoffMax.toFixed(0)} − stop ${stop.toFixed(0)}
+            </div>
+          </div>
+          <div style={{ padding: "12px 10px", background: "#090914", borderRadius: 8, textAlign: "center" }}>
+            <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>SE FICAR NO RANGE</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: S.red, fontFamily: "'Space Grotesk'", marginTop: 4 }}>
+              -${downBet}
+            </div>
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+              custo semanal do seguro
+            </div>
+          </div>
+        </div>
+
+        {/* Insight */}
+        <div style={{ fontSize: 11, fontFamily: "'Inter'", color: S.textDim, lineHeight: 1.5,
+          padding: "8px 12px", background: S.red + "08", borderRadius: 6, borderLeft: `2px solid ${S.red}40` }}>
+          {downOdd <= 2
+            ? "🔥 Odd muito baixa — considere apostar mais para lucrar se tocar"
+            : downOdd <= 5
+            ? "✅ Zona ideal — cobre residual com custo mínimo"
+            : "⚠ Odd moderada — verifique se o payoff ainda cobre o stop"}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════
 // EARLY ENTRY PANEL — Entrada na abertura com odd baixa
@@ -1506,12 +1627,15 @@ function AlertSetup({ ethPrice, plo, phi, capital, onSetAlert, requestAlertPermi
 // ═══════════════════════════════════════════════════════════════
 // POLYMARKET LIVE PANEL
 // ═══════════════════════════════════════════════════════════════
-function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
-  const [markets, setMarkets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
+  const [markets, setMarkets]     = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [expanded, setExpanded]   = useState(false);
+
   const upperLimit = ethPrice * (1 + rangePct / 100);
+  const lowerLimit = ethPrice * (1 - rangePct / 100);
 
   const fetchMarkets = async () => {
     setLoading(true); setError(null);
@@ -1538,98 +1662,144 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
   }, []);
 
   const allOutcomes = markets.flatMap(m => m.outcomes || []);
-  // Best hedge: strike above current price, odd between 5%-50% (useful asymmetry)
-  const bestMatch = allOutcomes
+
+  // Best upside match (strike above upper limit)
+  const bestUp = allOutcomes
     .filter(o => o.strike >= upperLimit * 0.95 && o.strike <= upperLimit * 1.5)
-    .filter(o => parseFloat(o.odd) >= 0.05 && parseFloat(o.odd) <= 0.50)
+    .filter(o => parseFloat(o.odd) >= 0.005 && parseFloat(o.odd) <= 0.50)
     .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0]
-    || allOutcomes
-    .filter(o => o.strike >= upperLimit * 0.95)
-    .filter(o => parseFloat(o.odd) < 0.50)
+    || allOutcomes.filter(o => o.strike >= upperLimit * 0.95).filter(o => parseFloat(o.odd) < 0.50)
     .sort((a, b) => a.strike - b.strike)[0];
 
+  // Best downside match (strike below lower limit)
+  const bestDown = allOutcomes
+    .filter(o => o.strike <= lowerLimit * 1.05 && o.strike >= lowerLimit * 0.6)
+    .filter(o => parseFloat(o.odd) >= 0.005 && parseFloat(o.odd) <= 0.50)
+    .sort((a, b) => Math.abs(a.strike - lowerLimit) - Math.abs(b.strike - lowerLimit))[0];
+
+  const marketTitle = markets[0]?.question || "ETH semanal";
+
   return (
-    <div className="card" style={{ borderColor: S.green + "40", marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div>
+    <div className="card" style={{ borderColor: S.green + "40" }}>
+      {/* ── Collapsed header — always visible ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        onClick={() => setExpanded(e => !e)} role="button"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
           <div className="label" style={{ color: S.green }}>POLYMARKET — ODDS AO VIVO</div>
-          {lastUpdate && <div style={{ fontSize: 10, color: S.dim, marginTop: 2, fontFamily: "'IBM Plex Mono'" }}>
-            Atualizado: {lastUpdate} · auto-refresh 60s
-          </div>}
+          {/* Best strike summary — always visible */}
+          {bestUp && !expanded && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>↑</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: S.green, fontFamily: "'Space Grotesk'" }}>
+                ${bestUp.strike.toLocaleString()}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: S.gold, fontFamily: "'IBM Plex Mono'" }}>
+                {bestUp.oddPct}%
+              </span>
+              <span onClick={e => { e.stopPropagation(); onSelectOdd && onSelectOdd(parseFloat(bestUp.odd)); }}
+                style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'",
+                  border: `1px solid ${S.gold}50`, borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}>
+                ↑ usar
+              </span>
+              {bestDown && <>
+                <span style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginLeft: 8 }}>↓</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: S.red, fontFamily: "'Space Grotesk'" }}>
+                  ${bestDown.strike.toLocaleString()}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>
+                  {bestDown.oddPct}%
+                </span>
+                <span onClick={e => { e.stopPropagation(); onSelectDownOdd && onSelectDownOdd(parseFloat(bestDown.odd)); }}
+                  style={{ fontSize: 9, color: S.textDim, fontFamily: "'IBM Plex Mono'",
+                    border: `1px solid ${S.border}`, borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}>
+                  ↓ usar
+                </span>
+              </>}
+            </div>
+          )}
         </div>
-        <button onClick={fetchMarkets} disabled={loading}
-          style={{ background: S.border, border: "none", color: S.text, padding: "6px 14px",
-            borderRadius: 6, cursor: "pointer", fontFamily: "'IBM Plex Mono'", fontSize: 11 }}>
-          {loading ? "carregando..." : "↻ atualizar"}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {lastUpdate && <span style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>{lastUpdate}</span>}
+          <button onClick={e => { e.stopPropagation(); fetchMarkets(); }} disabled={loading}
+            style={{ background: S.border, border: "none", color: S.text, padding: "4px 10px",
+              borderRadius: 6, cursor: "pointer", fontFamily: "'IBM Plex Mono'", fontSize: 10 }}>
+            {loading ? "..." : "↻"}
+          </button>
+          <span style={{ color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
+            {expanded ? "▲" : "▼"}
+          </span>
+        </div>
       </div>
 
-      {error && (
-        <div style={{ padding: "10px 14px", background: S.red + "15", borderRadius: 6,
-          color: S.red, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
-          {error}
-        </div>
-      )}
-
-      {loading && !markets.length && (
-        <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
-          buscando mercados...
-        </div>
-      )}
-
-      {markets.map(market => (
-        <div key={market.id} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: S.textDim, marginBottom: 8,
-            fontFamily: "'IBM Plex Mono'", borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
-            {market.question}
-            <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
-              Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
-            </span>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {(market.outcomes || []).map((o, i) => {
-              const isTarget = bestMatch && o.strike === bestMatch.strike && parseFloat(o.odd) <= 0.50;
-              return (
-                <div key={i}
-                  onClick={() => { if (onSelectOdd) { onSelectOdd(parseFloat(o.odd)); } }}
-                  style={{
-                    padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
-                    background: isTarget ? S.green + "20" : "#090914",
-                    border: "1px solid " + (isTarget ? S.green : S.border),
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = isTarget ? S.green : S.border}>
-                  <div style={{ fontSize: 10, color: isTarget ? S.green : S.dim,
-                    fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
-                    {isTarget ? "★ " : ""}${o.strike.toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: isTarget ? S.green : S.text, fontFamily: "'Space Grotesk'" }}>
-                    {o.oddPct}%
-                  </div>
-                  <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
-                    paga ${o.payoffPer100}/$100
-                  </div>
-                  <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
-                    ↑ usar
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {bestMatch && (
-        <div className="insight" style={{ borderColor: S.green, marginTop: 8 }}>
-          <strong style={{ color: S.green }}>Strike mais próximo do topo (${upperLimit.toFixed(0)}):</strong>{" "}
-          <strong style={{ color: S.gold }}>${bestMatch.strike.toLocaleString()}</strong> — odd{" "}
-          <strong style={{ color: S.gold }}>{bestMatch.oddPct}%</strong> — apostar $20 recebe{" "}
-          <strong style={{ color: S.green }}>${(20 / parseFloat(bestMatch.odd)).toFixed(0)}</strong>.
-          {parseFloat(bestMatch.odd) <= 0.15 ? " ✓ Odd ideal para hedge — boa assimetria." :
-            parseFloat(bestMatch.odd) <= 0.30 ? " ✓ Custo razoável — payoff ainda compensa." :
-            " ⚠ Odd moderada — verifique se o payoff cobre seu stop."}
+      {/* ── Expanded content ── */}
+      {expanded && (
+        <div style={{ marginTop: 14 }}>
+          {error && (
+            <div style={{ padding: "10px 14px", background: S.red + "15", borderRadius: 6,
+              color: S.red, fontSize: 12, fontFamily: "'IBM Plex Mono'", marginBottom: 10 }}>
+              {error}
+            </div>
+          )}
+          {loading && !markets.length && (
+            <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
+              buscando mercados...
+            </div>
+          )}
+          {markets.map(market => (
+            <div key={market.id} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: S.textDim, marginBottom: 8,
+                fontFamily: "'IBM Plex Mono'", borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
+                {market.question}
+                <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
+                  Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {(market.outcomes || []).map((o, i) => {
+                  const isUp   = bestUp   && o.strike === bestUp.strike;
+                  const isDown = bestDown && o.strike === bestDown.strike;
+                  return (
+                    <div key={i}
+                      onClick={() => { if (onSelectOdd) onSelectOdd(parseFloat(o.odd)); }}
+                      style={{ padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
+                        background: isUp ? S.green + "20" : isDown ? S.red + "15" : "#090914",
+                        border: "1px solid " + (isUp ? S.green : isDown ? S.red + "60" : S.border),
+                        cursor: "pointer", transition: "all 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = isUp ? S.green : isDown ? S.red + "60" : S.border}>
+                      <div style={{ fontSize: 10, color: isUp ? S.green : isDown ? S.red : S.dim,
+                        fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
+                        {isUp ? "★ " : isDown ? "▼ " : ""}${o.strike.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700,
+                        color: isUp ? S.green : isDown ? S.red : S.text, fontFamily: "'Space Grotesk'" }}>
+                        {o.oddPct}%
+                      </div>
+                      <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                        paga ${o.payoffPer100}/$100
+                      </div>
+                      <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
+                        ↑ usar
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {bestUp && (
+            <div className="insight" style={{ borderColor: S.green, marginTop: 8 }}>
+              <strong style={{ color: S.green }}>↑ Topo (${upperLimit.toFixed(0)}):</strong>{" "}
+              <strong style={{ color: S.gold }}>${bestUp.strike.toLocaleString()}</strong> — {bestUp.oddPct}% — $20 recebe{" "}
+              <strong style={{ color: S.green }}>${(20 / parseFloat(bestUp.odd)).toFixed(0)}</strong>
+              {bestDown && <>{" · "}
+                <strong style={{ color: S.red }}>↓ Fundo (${lowerLimit.toFixed(0)}):</strong>{" "}
+                <strong style={{ color: S.textDim }}>${bestDown.strike.toLocaleString()}</strong> — {bestDown.oddPct}% — $20 recebe{" "}
+                <strong style={{ color: S.textDim }}>${(20 / parseFloat(bestDown.odd)).toFixed(0)}</strong>
+              </>}
+            </div>
+          )}
         </div>
       )}
     </div>
