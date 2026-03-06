@@ -416,6 +416,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             : ethMoveWait === 0
             ? ` ✗ ETH lateral por ${waitDays} dias — sem viés, considere não apostar.`
             : ` ⚠ Odd já cara — avalie se payoff ainda cobre o stop.`}
+        </div>
       </CollapsibleCard>
 
       <CollapsibleCard title="DEPRECIAÇÃO DA APOSTA AO LONGO DA SEMANA" defaultOpen={true}>
@@ -1868,8 +1869,7 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
   return (
     <div className="card" style={{ borderColor: S.green + "40" }}>
       {/* ── Collapsed header — always visible ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
-        onClick={() => setExpanded(e => !e)} role="button"
+      <div onClick={() => setExpanded(e => !e)}
         style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
           <div className="label" style={{ color: S.green }}>POLYMARKET — ODDS AO VIVO</div>
