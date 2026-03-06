@@ -130,6 +130,29 @@ function Stat({ label, value, color, small }) {
   );
 }
 
+
+// ─── COLLAPSIBLE CARD ─────────────────────────────────────────
+function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, children, headerExtra }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card" style={{ borderColor: borderColor || S.border, padding: 0, overflow: "hidden" }}>
+      <div onClick={() => setOpen(o => !o)}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "14px 18px", cursor: "pointer", userSelect: "none",
+          borderBottom: open ? `1px solid ${S.border}` : "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+          <span className="label" style={{ color: titleColor || S.textDim, margin: 0 }}>{title}</span>
+          {headerExtra && <div style={{ flex: 1, minWidth: 0 }}>{headerExtra}</div>}
+        </div>
+        <span style={{ color: S.dim, fontSize: 11, fontFamily: "'IBM Plex Mono'", flexShrink: 0, marginLeft: 8 }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </div>
+      {open && <div style={{ padding: "16px 18px" }}>{children}</div>}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — POLYMARKET HEDGE
 // ═══════════════════════════════════════════════════════════════
@@ -144,6 +167,8 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   const [downOdd, setDownOdd] = useState(0.02);
   const [downBet, setDownBet] = useState(5);
   const [alertSet, setAlertSet] = useState(false);
+  const [shortEth, setShortEth]   = useState(0);      // ETH qty shorted
+  const [fundingRate, setFundingRate] = useState(0.01); // funding % per day
 
   // Auto-fill ETH price when live data arrives
   useEffect(() => {
@@ -161,6 +186,36 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   const winPayoff = betAmount / betOdd;
   const breakEvenDays = stop / feesDay;
   const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+  // Short perp calculations
+  const shortNotional  = shortEth * ethPrice;                        // $ value of short
+  const deltaLP        = -(capital / (2 * ethPrice));                 // LP natural delta (negative, sells ETH as price rises)
+  const deltaNeutral   = Math.abs(deltaLP);                          // ETH to short for delta-neutral
+  const shortPnlTop    = -shortEth * (ethPrice * rangeHi / 100);    // loss when ETH hits upper limit
+  const shortPnlBot    =  shortEth * (ethPrice * rangeLo / 100);    // gain when ETH hits lower limit
+  const fundingCostDay = shortNotional * (fundingRate / 100);        // daily funding cost
+  const fundingCostWeek = fundingCostDay * 7;
+
+  // Consolidated PnL — 3 scenarios (weekly)
+  const feesWeek = feesDay * 7;
+  const pnlRange = {
+    lp:     feesWeek,
+    short:  -fundingCostWeek,
+    bet:    -(betAmount + downBet),
+    total:  feesWeek - fundingCostWeek - betAmount - downBet,
+  };
+  const pnlTop = {
+    lp:     feesWeek - stop,
+    short:  shortPnlTop - fundingCostWeek,
+    bet:    winPayoff - betAmount - downBet,
+    total:  (feesWeek - stop) + (shortPnlTop - fundingCostWeek) + (winPayoff - betAmount - downBet),
+  };
+  const pnlBot = {
+    lp:     feesWeek - stop,
+    short:  shortPnlBot - fundingCostWeek,
+    bet:    -(betAmount + downBet) + (downBet / (downOdd / 100)),
+    total:  (feesWeek - stop) + (shortPnlBot - fundingCostWeek) + (-(betAmount + downBet) + (downBet / (downOdd / 100))),
+  };
 
   // Odd after waiting + price move
   // Price move INCREASES odd, time decay DECREASES odd — independent and multiplicative
@@ -211,9 +266,8 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       </div>
 
       {/* Pool + aposta inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div className="card">
-          <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA POOL</div>
+      <div className="grid-2" style={{ gap: 16 }}>
+        <CollapsibleCard title="CONFIGURAÇÃO DA POOL" defaultOpen={true}>
           <div className="grid-2-mobile" style={{ display: "grid", gap: 12 }}>
             <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
             <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
@@ -252,10 +306,9 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             </div>
             <input type="range" min={0.5} max={5} step={0.1} value={stopPct} onChange={e => setStopPct(+e.target.value)} />
           </div>
-        </div>
+        </CollapsibleCard>
 
-        <div className="card">
-          <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA APOSTA</div>
+        <CollapsibleCard title="CONFIGURAÇÃO DA APOSTA" defaultOpen={true}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -307,12 +360,11 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             <Stat label="STOP PÓS-APOSTA" value={`$${(stop - winPayoff + betAmount).toFixed(0)}`}
               color={(stop - winPayoff + betAmount) < 0 ? S.green : S.gold} small />
           </div>
-        </div>
+        </CollapsibleCard>
       </div>
 
-      {/* Timing optimizer */}
-      <div className="card" style={{ borderColor: S.gold + "40" }}>
-        <div className="label" style={{ marginBottom: 14, color: S.gold }}>OTIMIZADOR DE TIMING — ESPERAR ANTES DE APOSTAR</div>
+      <CollapsibleCard title="OTIMIZADOR DE TIMING — ESPERAR ANTES DE APOSTAR"
+        titleColor={S.gold} borderColor={S.gold + "40"} defaultOpen={false}>
         <div className="grid-2" style={{ gap: 24 }}>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -364,12 +416,9 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             : ethMoveWait === 0
             ? ` ✗ ETH lateral por ${waitDays} dias — sem viés, considere não apostar.`
             : ` ⚠ Odd já cara — avalie se payoff ainda cobre o stop.`}
-        </div>
-      </div>
+      </CollapsibleCard>
 
-      {/* Depreciação */}
-      <div className="card">
-        <div className="label" style={{ marginBottom: 12 }}>DEPRECIAÇÃO DA APOSTA AO LONGO DA SEMANA</div>
+      <CollapsibleCard title="DEPRECIAÇÃO DA APOSTA AO LONGO DA SEMANA" defaultOpen={true}>
         <div style={{ display: "flex", gap: 8 }}>
           {depreciacao.map(({ day, value, pct }) => {
             const isEntry = day === entryDay + 1;
@@ -437,39 +486,168 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
         </table>
       </div>
 
+      {/* Short Perp Card */}
+      <div className="card" style={{ borderColor: S.purple + "50" }}>
+        <div className="label" style={{ color: S.purple, marginBottom: 14 }}>⚡ SHORT PERPÉTUO — HEDGE DELTA</div>
+        <div className="grid-2" style={{ gap: 16 }}>
+
+          {/* Left — inputs */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span className="label">QUANTIDADE SHORT (ETH)</span>
+                <span style={{ color: S.purple, fontSize: 13, fontFamily: "'IBM Plex Mono'", fontWeight: 700 }}>
+                  {shortEth} ETH
+                </span>
+              </div>
+              <input type="range" min={0} max={Math.max(5, Math.ceil(deltaNeutral * 2))} step={0.05}
+                value={shortEth} onChange={e => setShortEth(+e.target.value)}
+                style={{ accentColor: S.purple }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9,
+                color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 4 }}>
+                <span>0 (sem hedge)</span>
+                <span style={{ color: S.purple }}>▼ delta neutro: {deltaNeutral.toFixed(3)} ETH</span>
+                <span>{Math.ceil(deltaNeutral * 2)} ETH</span>
+              </div>
+              {/* Delta neutral indicator */}
+              <div style={{ marginTop: 6, fontSize: 11, fontFamily: "'Inter'",
+                color: Math.abs(shortEth - deltaNeutral) < 0.05 ? S.green
+                     : shortEth < deltaNeutral * 0.5 ? S.red : S.gold }}>
+                {Math.abs(shortEth - deltaNeutral) < 0.05
+                  ? "✅ Delta neutro — posição perfeitamente hedgeada"
+                  : shortEth === 0
+                  ? "⚠ Sem short — exposição total ao movimento do ETH"
+                  : shortEth < deltaNeutral
+                  ? `⬇ Subhedgeado — delta residual: ${((deltaNeutral - shortEth) * ethPrice).toFixed(0)}$ em ETH`
+                  : `⬆ Superhedgeado — short domina: ${((shortEth - deltaNeutral) * ethPrice).toFixed(0)}$ acima do neutro`}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span className="label">FUNDING RATE (% / DIA)</span>
+                <span style={{ color: S.textDim, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>
+                  {fundingRate}%/dia → ${fundingCostWeek.toFixed(2)}/sem
+                </span>
+              </div>
+              <input type="range" min={0} max={0.2} step={0.005}
+                value={fundingRate} onChange={e => setFundingRate(+e.target.value)}
+                style={{ accentColor: S.purple }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9,
+                color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                <span>0%</span><span>0.05% (típico)</span><span>0.1% (alto)</span><span>0.2% (extremo)</span>
+              </div>
+            </div>
+
+            <div style={{ padding: "10px 12px", background: "#090914", borderRadius: 8,
+              border: `1px solid ${S.purple}30` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>NOTIONAL</span>
+                <span style={{ fontSize: 13, color: S.purple, fontFamily: "'IBM Plex Mono'", fontWeight: 600 }}>
+                  ${shortNotional.toFixed(0)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>PNL SE TOPO ↑</span>
+                <span style={{ fontSize: 13, color: S.red, fontFamily: "'IBM Plex Mono'" }}>
+                  {shortPnlTop >= 0 ? "+" : ""}${shortPnlTop.toFixed(0)}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>PNL SE FUNDO ↓</span>
+                <span style={{ fontSize: 13, color: S.green, fontFamily: "'IBM Plex Mono'" }}>
+                  +${shortPnlBot.toFixed(0)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right — PnL consolidado */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", letterSpacing: 1 }}>
+              PNL CONSOLIDADO — LP + SHORT + APOSTAS
+            </div>
+            {[
+              { label: "↔ RANGE (semana completa)", data: pnlRange, color: S.gold },
+              { label: "↑ TOPO (sai pelo limite superior)", data: pnlTop, color: S.green },
+              { label: "↓ FUNDO (sai pelo limite inferior)", data: pnlBot, color: S.red },
+            ].map(({ label, data, color }) => (
+              <div key={label} style={{ padding: "12px 14px", background: "#090914", borderRadius: 8,
+                border: `1px solid ${color}25` }}>
+                <div style={{ fontSize: 9, color: color, fontFamily: "'IBM Plex Mono'",
+                  letterSpacing: 1, marginBottom: 8 }}>{label}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {[
+                    { k: "LP (fees − stop)", v: data.lp },
+                    { k: "Short perp", v: data.short },
+                    { k: "Apostas", v: data.bet },
+                  ].map(({ k, v }) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 11, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>{k}</span>
+                      <span style={{ fontSize: 11, fontFamily: "'IBM Plex Mono'",
+                        color: v >= 0 ? S.green : S.red }}>
+                        {v >= 0 ? "+" : ""}${v.toFixed(0)}
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: `1px solid ${S.border}`, marginTop: 4, paddingTop: 6,
+                    display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>
+                      TOTAL
+                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 800, fontFamily: "'Space Grotesk'",
+                      color: data.total >= 0 ? S.green : S.red }}>
+                      {data.total >= 0 ? "+" : ""}${data.total.toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter'", lineHeight: 1.5,
+              padding: "8px 10px", background: S.purple + "08", borderRadius: 6,
+              borderLeft: `2px solid ${S.purple}40` }}>
+              💡 Delta neutro sugerido: <strong style={{ color: S.purple }}>{deltaNeutral.toFixed(3)} ETH</strong> = ${(deltaNeutral * ethPrice).toFixed(0)} notional
+              · Funding semanal: <strong style={{ color: fundingCostWeek > feesWeek * 0.1 ? S.red : S.textDim }}>${fundingCostWeek.toFixed(2)}</strong>
+              {fundingCostWeek > feesWeek * 0.15 && " ⚠ funding alto — monitore"}
+            </div>
+          </div>
+      </CollapsibleCard>
+
       {/* Alert Setup */}
       <AlertSetup ethPrice={ethPrice} plo={Plo} phi={Phi} capital={capital}
         onSetAlert={onSetAlert} requestAlertPermission={requestAlertPermission}
         alertSet={alertSet} setAlertSet={setAlertSet} />
 
       {/* Resumo previsibilidade */}
-      <div className="card" style={{ borderColor: S.green + "40" }}>
-        <div className="label" style={{ marginBottom: 12, color: S.green }}>PREVISIBILIDADE DE PERDAS — OBJETIVO FINAL</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+      <CollapsibleCard title="PREVISIBILIDADE — RESULTADO CONSOLIDADO"
+        titleColor={S.green} borderColor={S.green + "40"} defaultOpen={true}>
+        <div className="grid-3">
           {[
-            { label: "SAÍDA PELO FUNDO", value: "$0", sub: "hedge cobre 100%", color: S.green },
-            { label: "SAÍDA PELO TOPO SEM APOSTA", value: `-$${stop.toFixed(0)}`, sub: `-${stopPct}% do capital`, color: S.red },
-            { label: "SAÍDA PELO TOPO COM APOSTA", value: `$${Math.abs(stop - winPayoff + betAmount).toFixed(0)}`, sub: stop - winPayoff + betAmount < 0 ? "lucro!" : `-${((stop - winPayoff + betAmount) / capital * 100).toFixed(1)}%`, color: stop - winPayoff + betAmount < 0 ? S.green : S.gold },
+            { label: "↔ RANGE (semana)", value: `${pnlRange.total >= 0 ? "+" : ""}$${pnlRange.total.toFixed(0)}`, sub: `fees $${feesWeek.toFixed(0)} − funding $${fundingCostWeek.toFixed(0)} − apostas $${(betAmount+downBet).toFixed(0)}`, color: pnlRange.total >= 0 ? S.green : S.gold },
+            { label: "↑ TOPO (com short+aposta)", value: `${pnlTop.total >= 0 ? "+" : ""}$${pnlTop.total.toFixed(0)}`, sub: pnlTop.total >= 0 ? "operação lucrativa mesmo saindo!" : `${(pnlTop.total / capital * 100).toFixed(1)}% do capital`, color: pnlTop.total >= 0 ? S.green : S.gold },
+            { label: "↓ FUNDO (com short+aposta)", value: `${pnlBot.total >= 0 ? "+" : ""}$${pnlBot.total.toFixed(0)}`, sub: pnlBot.total >= 0 ? "short cobre o stop ✓" : `${(pnlBot.total / capital * 100).toFixed(1)}% do capital`, color: pnlBot.total >= 0 ? S.green : S.red },
           ].map(item => (
             <div key={item.label} style={{ textAlign: "center", padding: "16px", background: "#090914", borderRadius: 8, border: `1px solid ${item.color}20` }}>
               <div className="label">{item.label}</div>
               <div style={{ fontSize: 28, fontWeight: 800, color: item.color, fontFamily: "'Space Grotesk'", marginTop: 6 }}>{item.value}</div>
-              <div style={{ fontSize: 11, color: S.textDim, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>{item.sub}</div>
+              <div style={{ fontSize: 10, color: S.textDim, marginTop: 4, fontFamily: "'IBM Plex Mono'", lineHeight: 1.4 }}>{item.sub}</div>
             </div>
           ))}
         </div>
         <div className="insight" style={{ marginTop: 14 }}>
           <strong style={{ color: S.green }}>Custo anual do seguro:</strong> ${betAmount} × 52 semanas = ${(betAmount * 52).toFixed(0)} · 
           Fees anuais estimadas: ${(capital * apr / 100).toFixed(0)} · 
-          <strong style={{ color: S.gold }}> APR líquido: {(apr - (betAmount * 52 / capital * 100)).toFixed(0)}% aa</strong>
+          Funding anual: ${(fundingCostDay * 365).toFixed(0)} ·
+          <strong style={{ color: S.gold }}> APR líquido: {(apr - (betAmount * 52 / capital * 100) - (fundingCostDay * 365 / capital * 100)).toFixed(0)}% aa</strong>
         </div>
-      </div>
+      </CollapsibleCard>
 
-      {/* Strategy Overview Chart */}
+      <CollapsibleCard title="VISÃO GERAL DA ESTRATÉGIA" titleColor={S.gold} borderColor={S.gold + '40'} defaultOpen={true}>
       <StrategyChart
         ethPrice={ethPrice} capital={capital} rangeLo={rangeLo} rangeHi={rangeHi}
         apr={apr} stopPct={stopPct} betOdd={betOdd} betAmount={betAmount}
       />
+      </CollapsibleCard>
     </div>
   );
 }
@@ -1119,13 +1297,8 @@ function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDo
   const netIfFund     = payoffMax - stop;
 
   return (
-    <div className="card" style={{ borderColor: S.red + "40" }}>
-      <div style={{ marginBottom: 14 }}>
-        <div className="label" style={{ color: S.red }}>⬇ HEDGE DOWNSIDE</div>
-        <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 4 }}>
-          Strike -10% · Short cobre ~60% · aposta cobre o resíduo
-        </div>
-      </div>
+    <CollapsibleCard title="⬇ HEDGE DOWNSIDE" titleColor={S.red} borderColor={S.red + "40"} defaultOpen={true}
+      headerExtra={<span style={{ fontSize: 10, color: S.textDim, fontFamily: "'Inter'" }}>Strike -10% · Short cobre ~60% · aposta cobre o resíduo</span>}>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {/* Strike info */}
@@ -1273,14 +1446,9 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
   const annualNet    = expectedWeekly * 52;
 
   return (
-    <div className="card" style={{ borderColor: S.gold + "60" }}>
-      <div style={{ marginBottom: 14 }}>
-        <div className="label" style={{ color: S.gold }}>⚡ ENTRADA NA ABERTURA — ESTRATÉGIA DE ODD BAIXA</div>
-        <div style={{ fontSize: 12, color: S.textDim, fontFamily: "'Inter'", marginTop: 4 }}>
-          Domingo 21h Brasília · Strike +10% · Mercado frio · Máxima assimetria
-        </div>
-      </div>
-
+    <CollapsibleCard title="⚡ ENTRADA NA ABERTURA — ESTRATÉGIA DE ODD BAIXA"
+      titleColor={S.gold} borderColor={S.gold + "60"} defaultOpen={true}
+      headerExtra={<span style={{ fontSize: 10, color: S.textDim, fontFamily: "'Inter'" }}>Domingo 21h Brasília · Strike +10% · Máxima assimetria</span>}>
       <div className="grid-2" style={{ gap: 16 }}>
 
         {/* Inputs */}
@@ -1450,7 +1618,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
           </div>
         </div>
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }
 
