@@ -84,6 +84,24 @@ const css = `
   .insight{padding:14px 16px;background:#090914;border-radius:8px;
     border-left:3px solid ${S.gold};font-size:13px;color:${S.textDim};
     font-family:'Inter',sans-serif;line-height:1.8;margin-top:14px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;}
+  @media(max-width:700px){
+    .card{padding:14px;}
+    .tab{padding:8px 12px;font-size:12px;}
+    .grid-2,.grid-3,.grid-4,.grid-5{grid-template-columns:1fr!important;}
+    .grid-2-mobile{grid-template-columns:1fr 1fr!important;}
+    .hide-mobile{display:none!important;}
+    table{font-size:11px;}
+    th,td{padding:5px 4px;}
+    .value{font-size:18px!important;}
+    input[type=number]{font-size:16px;}
+  }
+  @media(max-width:480px){
+    .grid-2-mobile{grid-template-columns:1fr!important;}
+  }
 `;
 
 // ─── INPUT FIELD ──────────────────────────────────────────────
@@ -187,7 +205,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} onSelectDownOdd={odd => setDownOdd(odd)} />
 
       {/* Early entry panels — side by side */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="grid-2">
         <EarlyEntryPanel ethPrice={ethPrice} betOdd={betOdd} setBetOdd={setBetOdd} />
         <DownsidePanel ethPrice={ethPrice} rangePct={rangeLo} downOdd={downOdd} setDownOdd={setDownOdd} downBet={downBet} setDownBet={setDownBet} stopPct={stopPct} capital={capital} feesDay={feesDay} />
       </div>
@@ -196,7 +214,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div className="card">
           <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO DA POOL</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid-2-mobile" style={{ display: "grid", gap: 12 }}>
             <Field label="PREÇO ETH" value={ethPrice} onChange={setEthPrice} prefix="$" min={100} max={10000} step={10} />
             <Field label="CAPITAL TOTAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
             <div>
@@ -223,7 +241,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             </div>
             <Field label="APR ESTIMADO" value={apr} onChange={setApr} suffix="% aa" min={10} max={500} step={5} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+          <div className="grid-2-mobile" style={{ display: "grid", gap: 10, marginTop: 14 }}>
             <Stat label="FEES / DIA" value={`$${feesDay.toFixed(1)}`} color={S.green} small />
             <Stat label="STOP NOS LIMITES" value={`$${stop.toFixed(0)} (${stopPct}%)`} color={S.red} small />
           </div>
@@ -295,7 +313,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
       {/* Timing optimizer */}
       <div className="card" style={{ borderColor: S.gold + "40" }}>
         <div className="label" style={{ marginBottom: 14, color: S.gold }}>OTIMIZADOR DE TIMING — ESPERAR ANTES DE APOSTAR</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+        <div className="grid-2" style={{ gap: 24 }}>
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">DIAS DE ESPERA</span>
@@ -318,7 +336,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 14 }}>
+        <div className="grid-4" style={{ marginTop: 14 }}>
           <Stat label="ODD ORIGINAL" value={`${(betOdd * 100).toFixed(0)}%`} color={S.textDim} small />
           <Stat label="ODD APÓS ESPERA" value={`${(oddAfterWait * 100).toFixed(0)}%`} color={oddAfterWait > betOdd ? S.green : S.red} small />
           <Stat label="PAYOFF APÓS ESPERA" value={`$${winPayoffAfterWait.toFixed(0)}`} color={winPayoffAfterWait >= winPayoff ? S.green : S.gold} small />
@@ -685,7 +703,7 @@ function StrategyChart({ ethPrice, capital, rangeLo, rangeHi, apr, stopPct, betO
       <div className="label" style={{ marginBottom: 12, color: S.gold }}>VISÃO GERAL DA ESTRATÉGIA</div>
       <canvas ref={canvasRef} width={820} height={320}
         style={{ width: "100%", height: "auto", borderRadius: 8, display: "block" }} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
+      <div className="grid-3" style={{ marginTop: 12 }}>
         {[
           { color: S.green,   dash: false, label: "Saída pelo topo",  sub: "Aposta cobre o stop → lucro" },
           { color: S.gold,    dash: true,  label: "Lateral no range", sub: "Fees acumulam semana a semana" },
@@ -979,7 +997,7 @@ function TabScenarios() {
       {/* Controls */}
       <div className="card">
         <div className="label" style={{ marginBottom: 14 }}>PARÂMETROS GLOBAIS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20 }}>
+        <div className="grid-5">
           <Field label="CAPITAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
           <Field label="APR" value={apr} onChange={setApr} suffix="%" min={10} max={500} step={5} />
           <Field label="STOP %" value={stopPct} onChange={setStopPct} suffix="%" min={0.5} max={5} step={0.1} />
@@ -1003,7 +1021,7 @@ function TabScenarios() {
       </div>
 
       {/* Scenario grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="grid-2" style={{ gap: 14 }}>
         {SCENARIO_META.map((sc, idx) => {
           const r = results[idx];
           const isActive = activeIdx === idx;
@@ -1263,7 +1281,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="grid-2" style={{ gap: 16 }}>
 
         {/* Inputs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1385,7 +1403,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
           </div>
 
           {/* Stats row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div className="grid-2-mobile" style={{ display: "grid", gap: 8 }}>
             <div style={{ padding: "10px 8px", background: "#090914", borderRadius: 8, textAlign: "center" }}>
               <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>SE VENCER (100%)</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: S.green, fontFamily: "'Space Grotesk'" }}>
@@ -1931,7 +1949,7 @@ export default function App() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 24, overflowX: "auto", paddingBottom: 4 }}>
           {tabs.map((t, i) => (
             <button key={i} className={`tab ${tab === i ? "active" : "inactive"}`}
               onClick={() => setTab(i)}
@@ -1943,7 +1961,7 @@ export default function App() {
       </div>
 
       {/* Content */}
-      <div style={{ padding: "0 28px 40px", maxWidth: 960, margin: "0 auto" }}>
+      <div style={{ padding: "0 clamp(8px, 3vw, 28px) 40px", maxWidth: 960, margin: "0 auto" }}>
         {tab === 0 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
         {tab === 1 && <TabScenarios />}
         {tab === 2 && <TabMaintenance />}
@@ -2027,7 +2045,7 @@ function TabMaintenance() {
       {/* Global params */}
       <div className="card">
         <div className="label" style={{ marginBottom: 14 }}>PARÂMETROS DA POSIÇÃO</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+        <div className="grid-5">
           <Field label="CAPITAL"   value={capital}  onChange={setCapital}  prefix="$" min={500}  max={50000} step={100} />
           <Field label="APR"       value={apr}      onChange={setApr}      suffix="%" min={10}   max={500}   step={5} />
           <Field label="STOP %"    value={stopPct}  onChange={setStopPct}  suffix="%" min={0.5}  max={5}     step={0.1} />
