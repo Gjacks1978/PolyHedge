@@ -451,11 +451,10 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
         <div style={{ fontSize: 10, color: S.dim, marginTop: 8, fontFamily: "'IBM Plex Mono'" }}>
           Valor de revenda no mercado secundário · % do custo original recuperável
         </div>
-      </div>
+      </CollapsibleCard>
 
-      {/* Cenários */}
-      <div className="card">
-        <div className="label" style={{ marginBottom: 12 }}>CENÁRIOS DE SAÍDA — ETH TOCA O LIMITE SUPERIOR</div>
+      <CollapsibleCard title="CENÁRIOS DE SAÍDA — ETH TOCA O LIMITE SUPERIOR" defaultOpen={true}>
+        <div style={{ overflowX: "auto" }}>
         <table>
           <thead>
             <tr>
@@ -485,11 +484,11 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      </CollapsibleCard>
 
-      {/* Short Perp Card */}
-      <div className="card" style={{ borderColor: S.purple + "50" }}>
-        <div className="label" style={{ color: S.purple, marginBottom: 14 }}>⚡ SHORT PERPÉTUO — HEDGE DELTA</div>
+      <CollapsibleCard title="⚡ SHORT PERPÉTUO — HEDGE DELTA"
+        titleColor={S.purple} borderColor={S.purple + "50"} defaultOpen={true}>
         <div className="grid-2" style={{ gap: 16 }}>
 
           {/* Left — inputs */}
@@ -612,6 +611,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
               {fundingCostWeek > feesWeek * 0.15 && " ⚠ funding alto — monitore"}
             </div>
           </div>
+        </div>
       </CollapsibleCard>
 
       {/* Alert Setup */}
@@ -1384,8 +1384,7 @@ function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDo
             ? "✅ Zona ideal — cobre residual com custo mínimo"
             : "⚠ Odd moderada — verifique se o payoff ainda cobre o stop"}
         </div>
-      </div>
-    </div>
+    </CollapsibleCard>
   );
 }
 
