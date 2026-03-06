@@ -1384,6 +1384,7 @@ function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDo
             ? "✅ Zona ideal — cobre residual com custo mínimo"
             : "⚠ Odd moderada — verifique se o payoff ainda cobre o stop"}
         </div>
+      </div>
     </CollapsibleCard>
   );
 }
