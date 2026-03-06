@@ -1854,25 +1854,25 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
   const weeklyMarket = markets.find(m => /\d+-\d+/.test(m.question)) || markets[0];
   const otherMarkets = markets.filter(m => m !== weeklyMarket);
 
-  // Best upside/downside from weekly market only
+  // Best upside/downside from weekly market — no strike filter, show all
   const weeklyOutcomes = weeklyMarket?.outcomes || [];
   const bestUp = weeklyOutcomes
     .filter(o => o.strike >= upperLimit * 0.95)
     .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0];
   const bestDown = weeklyOutcomes
-    .filter(o => o.strike <= lowerLimit * 1.05 && o.strike >= lowerLimit * 0.6)
+    .filter(o => o.strike <= lowerLimit * 1.05)
     .sort((a, b) => Math.abs(a.strike - lowerLimit) - Math.abs(b.strike - lowerLimit))[0];
 
-  const renderMarket = (market) => {
+  const renderMarket = (market, hideTitle = false) => {
     return (
       <div key={market.id} style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: S.textDim, marginBottom: 8, fontFamily: "'IBM Plex Mono'",
+        {!hideTitle && <div style={{ fontSize: 11, color: S.textDim, marginBottom: 8, fontFamily: "'IBM Plex Mono'",
           borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
           {market.question}
           <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
             Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
           </span>
-        </div>
+        </div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(market.outcomes || []).map((o, i) => {
             const isUp   = bestUp   && o.strike === bestUp.strike   && market === weeklyMarket;
@@ -1955,7 +1955,7 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
       )}
 
       {/* ── Weekly market — ALWAYS visible ── */}
-      {weeklyMarket && renderMarket(weeklyMarket)}
+      {weeklyMarket && renderMarket(weeklyMarket, true)}
 
       {/* ── Other markets — only when expanded ── */}
       {expanded && otherMarkets.map(m => renderMarket(m))}
