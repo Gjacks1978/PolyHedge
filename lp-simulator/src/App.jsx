@@ -141,7 +141,7 @@ function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, c
           padding: "14px 18px", cursor: "pointer", userSelect: "none",
           borderBottom: open ? `1px solid ${S.border}` : "none" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-          <span className="label" style={{ color: titleColor || S.textDim, margin: 0 }}>{title}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: titleColor || S.textDim, margin: 0 }}>{title}</span>
           {headerExtra && <div style={{ flex: 1, minWidth: 0 }}>{headerExtra}</div>}
         </div>
         <span style={{ color: S.dim, fontSize: 11, fontFamily: "'IBM Plex Mono'", flexShrink: 0, marginLeft: 8 }}>
@@ -317,21 +317,21 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
                   {(betOdd * 100).toFixed(0)}% → paga {(1/betOdd).toFixed(1)}x
                 </span>
               </div>
-              <input type="range" min={3} max={50} step={1}
-                value={Math.round(betOdd * 100)}
+              <input type="range" min={1} max={50} step={0.5}
+                value={Math.round(betOdd * 1000) / 10}
                 onChange={e => setBetOdd(+e.target.value / 100)} />
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: S.dim, marginTop: 3, fontFamily: "'IBM Plex Mono'" }}>
-                <span>3% (33x)</span><span>15%</span><span>25%</span><span>50% (2x)</span>
+                <span>1% (100x)</span><span>15%</span><span>25%</span><span>50% (2x)</span>
               </div>
               <div style={{ height: 4, borderRadius: 2, marginTop: 6,
-                background: `linear-gradient(to right, ${S.green} ${(betOdd*100-3)/47*100}%, ${betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red} ${(betOdd*100-3)/47*100}%, transparent)`,
+                background: `linear-gradient(to right, ${S.green} ${(betOdd*100-0.5)/49.5*100}%, ${betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red} ${(betOdd*100-0.5)/49.5*100}%, transparent)`,
                 border: `1px solid ${S.border}` }} />
               <div style={{ fontSize: 10, color: betOdd<=0.15?S.green:betOdd<=0.30?S.gold:S.red, marginTop: 4, fontFamily: "'IBM Plex Mono'" }}>
                 {betOdd<=0.10 ? "✓ Assimetria máxima" : betOdd<=0.20 ? "✓ Zona ideal de hedge" : betOdd<=0.35 ? "⚠ Odd moderada" : "✗ Pouca assimetria"}
               </div>
             </div>
             <div>
-              <div className="label" style={{ marginBottom: 8 }}>DIA DE ENTRADA</div>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 8 }}>DIA DE ENTRADA</div>
               <div style={{ display: "flex", flexWrap: "wrap" }}>
                 {[0, 1, 2, 3].map(d => (
                   <span key={d} className="pill"
@@ -879,7 +879,7 @@ function StrategyChart({ ethPrice, capital, rangeLo, rangeHi, apr, stopPct, betO
 
   return (
     <div className="card" style={{ borderColor: S.gold + "40" }}>
-      <div className="label" style={{ marginBottom: 12, color: S.gold }}>VISÃO GERAL DA ESTRATÉGIA</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 12, color: S.gold }}>VISÃO GERAL DA ESTRATÉGIA</div>
       <canvas ref={canvasRef} width={820} height={320}
         style={{ width: "100%", height: "auto", borderRadius: 8, display: "block" }} />
       <div className="grid-3" style={{ marginTop: 12 }}>
@@ -1175,7 +1175,7 @@ function TabScenarios() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Controls */}
       <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>PARÂMETROS GLOBAIS</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 14 }}>PARÂMETROS GLOBAIS</div>
         <div className="grid-5">
           <Field label="CAPITAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
           <Field label="APR" value={apr} onChange={setApr} suffix="%" min={10} max={500} step={5} />
@@ -1254,7 +1254,7 @@ function TabScenarios() {
 
       {/* Summary */}
       <div className="card">
-        <div className="label" style={{ marginBottom: 12 }}>RESUMO COMPARATIVO</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 12 }}>RESUMO COMPARATIVO</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           {SCENARIO_META.map((sc, idx) => {
             const r = results[idx];
@@ -1333,11 +1333,11 @@ function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDo
               {downOdd}% → {multMax.toFixed(0)}x
             </span>
           </div>
-          <input type="range" min={0.5} max={15} step={0.5}
+          <input type="range" min={1} max={15} step={0.5}
             value={downOdd} onChange={e => setDownOdd(+e.target.value)} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9,
             color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
-            <span>0.5% (200x)</span><span>5% (20x)</span><span>15% (7x)</span>
+            <span>1% (100x)</span><span>5% (20x)</span><span>15% (7x)</span>
           </div>
         </div>
 
@@ -2212,7 +2212,7 @@ function TabMaintenance() {
 
       {/* Global params */}
       <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>PARÂMETROS DA POSIÇÃO</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 14 }}>PARÂMETROS DA POSIÇÃO</div>
         <div className="grid-5">
           <Field label="CAPITAL"   value={capital}  onChange={setCapital}  prefix="$" min={500}  max={50000} step={100} />
           <Field label="APR"       value={apr}      onChange={setApr}      suffix="%" min={10}   max={500}   step={5} />
@@ -2245,7 +2245,7 @@ function TabMaintenance() {
 
       {/* Visual timeline */}
       <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>EVOLUÇÃO DO HEDGE — SEMANA A SEMANA</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 14 }}>EVOLUÇÃO DO HEDGE — SEMANA A SEMANA</div>
         <div style={{ position: "relative", height: 120, marginBottom: 8 }}>
           {rows.map((r, i) => {
             const w    = 100 / rows.length;
@@ -2290,7 +2290,7 @@ function TabMaintenance() {
 
       {/* Week-by-week table */}
       <div className="card">
-        <div className="label" style={{ marginBottom: 14 }}>CONFIGURAÇÃO POR SEMANA</div>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 14 }}>CONFIGURAÇÃO POR SEMANA</div>
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>
