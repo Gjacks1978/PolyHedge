@@ -1591,14 +1591,16 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
               const isTarget = bestMatch && o.strike === bestMatch.strike && parseFloat(o.odd) <= 0.50;
               return (
                 <div key={i}
-                  onClick={() => onSelectOdd && parseFloat(o.odd) <= 0.50 && onSelectOdd(parseFloat(o.odd))}
+                  onClick={() => { if (onSelectOdd) { onSelectOdd(parseFloat(o.odd)); } }}
                   style={{
                     padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
                     background: isTarget ? S.green + "20" : "#090914",
                     border: "1px solid " + (isTarget ? S.green : S.border),
-                    cursor: parseFloat(o.odd) <= 0.50 ? "pointer" : "default",
+                    cursor: "pointer",
                     transition: "all 0.15s",
-                  }}>
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = isTarget ? S.green : S.border}>
                   <div style={{ fontSize: 10, color: isTarget ? S.green : S.dim,
                     fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
                     {isTarget ? "★ " : ""}${o.strike.toLocaleString()}
@@ -1609,11 +1611,9 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd }) {
                   <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
                     paga ${o.payoffPer100}/$100
                   </div>
-                  {parseFloat(o.odd) <= 0.50 && (
-                    <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
-                      ↑ usar
-                    </div>
-                  )}
+                  <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
+                    ↑ usar
+                  </div>
                 </div>
               );
             })}
