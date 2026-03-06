@@ -132,7 +132,7 @@ function Stat({ label, value, color, small }) {
 
 
 // ─── COLLAPSIBLE CARD ─────────────────────────────────────────
-function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, children, headerExtra }) {
+function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, children, subtitle }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="card" style={{ borderColor: borderColor || S.border, padding: 0, overflow: "hidden" }}>
@@ -140,11 +140,11 @@ function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, c
         style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "14px 18px", cursor: "pointer", userSelect: "none",
           borderBottom: open ? `1px solid ${S.border}` : "none" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: titleColor || S.textDim, margin: 0 }}>{title}</span>
-          {headerExtra && <div style={{ flex: 1, minWidth: 0 }}>{headerExtra}</div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: titleColor || S.textDim }}>{title}</span>
+          {subtitle && <span style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter',sans-serif", fontWeight: 400 }}>{subtitle}</span>}
         </div>
-        <span style={{ color: S.dim, fontSize: 11, fontFamily: "'IBM Plex Mono'", flexShrink: 0, marginLeft: 8 }}>
+        <span style={{ color: S.dim, fontSize: 11, fontFamily: "'IBM Plex Mono'", flexShrink: 0, marginLeft: 12 }}>
           {open ? "▲" : "▼"}
         </span>
       </div>
@@ -304,7 +304,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
               <span className="label">STOP % NOS LIMITES</span>
               <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{stopPct}%</span>
             </div>
-            <input type="range" min={0.5} max={5} step={0.1} value={stopPct} onChange={e => setStopPct(+e.target.value)} />
+            <input type="range" min={0.5} max={15} step={0.1} value={stopPct} onChange={e => setStopPct(+e.target.value)} />
           </div>
         </CollapsibleCard>
 
@@ -1179,7 +1179,7 @@ function TabScenarios() {
         <div className="grid-5">
           <Field label="CAPITAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
           <Field label="APR" value={apr} onChange={setApr} suffix="%" min={10} max={500} step={5} />
-          <Field label="STOP %" value={stopPct} onChange={setStopPct} suffix="%" min={0.5} max={5} step={0.1} />
+          <Field label="STOP %" value={stopPct} onChange={setStopPct} suffix="%" min={0.5} max={15} step={0.1} />
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
               <span className="label">ODD APOSTA</span>
@@ -1299,7 +1299,7 @@ function DownsidePanel({ ethPrice, rangePct, downOdd, setDownOdd, downBet, setDo
 
   return (
     <CollapsibleCard title="⬇ HEDGE DOWNSIDE" titleColor={S.red} borderColor={S.red + "40"} defaultOpen={true}
-      headerExtra={<span style={{ fontSize: 10, color: S.textDim, fontFamily: "'Inter'" }}>Strike -10% · Short cobre ~60% · aposta cobre o resíduo</span>}>
+      subtitle="Strike -10% · Short cobre ~60% · aposta cobre o resíduo">
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {/* Strike info */}
@@ -1449,7 +1449,7 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
   return (
     <CollapsibleCard title="⚡ ENTRADA NA ABERTURA — ESTRATÉGIA DE ODD BAIXA"
       titleColor={S.gold} borderColor={S.gold + "60"} defaultOpen={true}
-      headerExtra={<span style={{ fontSize: 10, color: S.textDim, fontFamily: "'Inter'" }}>Domingo 21h Brasília · Strike +10% · Máxima assimetria</span>}>
+      subtitle="Domingo 21h Brasília · Strike +10% · Máxima assimetria">
       <div className="grid-2" style={{ gap: 16 }}>
 
         {/* Inputs */}
@@ -1850,59 +1850,82 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
 
   const allOutcomes = markets.flatMap(m => m.outcomes || []);
 
-  // Best upside match (strike above upper limit)
-  const bestUp = allOutcomes
-    .filter(o => o.strike >= upperLimit * 0.95 && o.strike <= upperLimit * 1.5)
-    .filter(o => parseFloat(o.odd) >= 0.005 && parseFloat(o.odd) <= 0.50)
-    .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0]
-    || allOutcomes.filter(o => o.strike >= upperLimit * 0.95).filter(o => parseFloat(o.odd) < 0.50)
-    .sort((a, b) => a.strike - b.strike)[0];
+  // Identify weekly market (shortest question / contains week range like "March 2-8")
+  const weeklyMarket = markets.find(m => /\d+-\d+/.test(m.question)) || markets[0];
+  const otherMarkets = markets.filter(m => m !== weeklyMarket);
 
-  // Best downside match (strike below lower limit)
-  const bestDown = allOutcomes
+  // Best upside/downside from weekly market only
+  const weeklyOutcomes = weeklyMarket?.outcomes || [];
+  const bestUp = weeklyOutcomes
+    .filter(o => o.strike >= upperLimit * 0.95)
+    .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0];
+  const bestDown = weeklyOutcomes
     .filter(o => o.strike <= lowerLimit * 1.05 && o.strike >= lowerLimit * 0.6)
-    .filter(o => parseFloat(o.odd) >= 0.005 && parseFloat(o.odd) <= 0.50)
     .sort((a, b) => Math.abs(a.strike - lowerLimit) - Math.abs(b.strike - lowerLimit))[0];
 
-  const marketTitle = markets[0]?.question || "ETH semanal";
+  const renderMarket = (market) => {
+    return (
+      <div key={market.id} style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: S.textDim, marginBottom: 8, fontFamily: "'IBM Plex Mono'",
+          borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
+          {market.question}
+          <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
+            Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+          </span>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {(market.outcomes || []).map((o, i) => {
+            const isUp   = bestUp   && o.strike === bestUp.strike   && market === weeklyMarket;
+            const isDown = bestDown && o.strike === bestDown.strike && market === weeklyMarket;
+            return (
+              <div key={i}
+                onClick={() => { if (onSelectOdd) onSelectOdd(parseFloat(o.odd)); }}
+                style={{ padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
+                  background: isUp ? S.green + "20" : isDown ? S.red + "15" : "#090914",
+                  border: "1px solid " + (isUp ? S.green : isDown ? S.red + "60" : S.border),
+                  cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
+                onMouseLeave={e => e.currentTarget.style.borderColor = isUp ? S.green : isDown ? S.red + "60" : S.border}>
+                <div style={{ fontSize: 10, color: isUp ? S.green : isDown ? S.red : S.dim,
+                  fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
+                  {isUp ? "★ " : isDown ? "▼ " : ""}${o.strike.toLocaleString()}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700,
+                  color: isUp ? S.green : isDown ? S.red : S.text, fontFamily: "'Space Grotesk'" }}>
+                  {o.oddPct}%
+                </div>
+                <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
+                  paga ${o.payoffPer100}/$100
+                </div>
+                <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
+                  ↑ usar
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="card" style={{ borderColor: S.green + "40" }}>
-      {/* ── Collapsed header — always visible ── */}
+      {/* ── Header ── */}
       <div onClick={() => setExpanded(e => !e)}
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-          <div className="label" style={{ color: S.green }}>POLYMARKET — ODDS AO VIVO</div>
-          {/* Best strike summary — always visible */}
-          {bestUp && !expanded && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>↑</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: S.green, fontFamily: "'Space Grotesk'" }}>
-                ${bestUp.strike.toLocaleString()}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+          cursor: "pointer", marginBottom: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px",
+            fontFamily: "'IBM Plex Mono',monospace", color: S.green }}>
+            POLYMARKET — ODDS AO VIVO
+          </span>
+          {weeklyMarket && (
+            <span style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'" }}>
+              {weeklyMarket.question}
+              <span style={{ marginLeft: 6 }}>
+                Vol: ${parseFloat(weeklyMarket.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: S.gold, fontFamily: "'IBM Plex Mono'" }}>
-                {bestUp.oddPct}%
-              </span>
-              <span onClick={e => { e.stopPropagation(); onSelectOdd && onSelectOdd(parseFloat(bestUp.odd)); }}
-                style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'",
-                  border: `1px solid ${S.gold}50`, borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}>
-                ↑ usar
-              </span>
-              {bestDown && <>
-                <span style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginLeft: 8 }}>↓</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: S.red, fontFamily: "'Space Grotesk'" }}>
-                  ${bestDown.strike.toLocaleString()}
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: S.textDim, fontFamily: "'IBM Plex Mono'" }}>
-                  {bestDown.oddPct}%
-                </span>
-                <span onClick={e => { e.stopPropagation(); onSelectDownOdd && onSelectDownOdd(parseFloat(bestDown.odd)); }}
-                  style={{ fontSize: 9, color: S.textDim, fontFamily: "'IBM Plex Mono'",
-                    border: `1px solid ${S.border}`, borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}>
-                  ↓ usar
-                </span>
-              </>}
-            </div>
+            </span>
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1918,74 +1941,36 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
         </div>
       </div>
 
-      {/* ── Expanded content ── */}
-      {expanded && (
-        <div style={{ marginTop: 14 }}>
-          {error && (
-            <div style={{ padding: "10px 14px", background: S.red + "15", borderRadius: 6,
-              color: S.red, fontSize: 12, fontFamily: "'IBM Plex Mono'", marginBottom: 10 }}>
-              {error}
-            </div>
-          )}
-          {loading && !markets.length && (
-            <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
-              buscando mercados...
-            </div>
-          )}
-          {markets.map(market => (
-            <div key={market.id} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: S.textDim, marginBottom: 8,
-                fontFamily: "'IBM Plex Mono'", borderBottom: "1px solid " + S.border, paddingBottom: 6 }}>
-                {market.question}
-                <span style={{ color: S.dim, marginLeft: 8, fontSize: 10 }}>
-                  Vol: ${parseFloat(market.volume || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {(market.outcomes || []).map((o, i) => {
-                  const isUp   = bestUp   && o.strike === bestUp.strike;
-                  const isDown = bestDown && o.strike === bestDown.strike;
-                  return (
-                    <div key={i}
-                      onClick={() => { if (onSelectOdd) onSelectOdd(parseFloat(o.odd)); }}
-                      style={{ padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
-                        background: isUp ? S.green + "20" : isDown ? S.red + "15" : "#090914",
-                        border: "1px solid " + (isUp ? S.green : isDown ? S.red + "60" : S.border),
-                        cursor: "pointer", transition: "all 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = isUp ? S.green : isDown ? S.red + "60" : S.border}>
-                      <div style={{ fontSize: 10, color: isUp ? S.green : isDown ? S.red : S.dim,
-                        fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
-                        {isUp ? "★ " : isDown ? "▼ " : ""}${o.strike.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700,
-                        color: isUp ? S.green : isDown ? S.red : S.text, fontFamily: "'Space Grotesk'" }}>
-                        {o.oddPct}%
-                      </div>
-                      <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
-                        paga ${o.payoffPer100}/$100
-                      </div>
-                      <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
-                        ↑ usar
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          {bestUp && (
-            <div className="insight" style={{ borderColor: S.green, marginTop: 8 }}>
-              <strong style={{ color: S.green }}>↑ Topo (${upperLimit.toFixed(0)}):</strong>{" "}
-              <strong style={{ color: S.gold }}>${bestUp.strike.toLocaleString()}</strong> — {bestUp.oddPct}% — $20 recebe{" "}
-              <strong style={{ color: S.green }}>${(20 / parseFloat(bestUp.odd)).toFixed(0)}</strong>
-              {bestDown && <>{" · "}
-                <strong style={{ color: S.red }}>↓ Fundo (${lowerLimit.toFixed(0)}):</strong>{" "}
-                <strong style={{ color: S.textDim }}>${bestDown.strike.toLocaleString()}</strong> — {bestDown.oddPct}% — $20 recebe{" "}
-                <strong style={{ color: S.textDim }}>${(20 / parseFloat(bestDown.odd)).toFixed(0)}</strong>
-              </>}
-            </div>
-          )}
+      {/* ── Errors / loading ── */}
+      {error && (
+        <div style={{ padding: "10px 14px", background: S.red + "15", borderRadius: 6,
+          color: S.red, fontSize: 12, fontFamily: "'IBM Plex Mono'", marginBottom: 10 }}>
+          {error}
+        </div>
+      )}
+      {loading && !markets.length && (
+        <div style={{ textAlign: "center", padding: 24, color: S.dim, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>
+          buscando mercados...
+        </div>
+      )}
+
+      {/* ── Weekly market — ALWAYS visible ── */}
+      {weeklyMarket && renderMarket(weeklyMarket)}
+
+      {/* ── Other markets — only when expanded ── */}
+      {expanded && otherMarkets.map(m => renderMarket(m))}
+
+      {/* ── Insight ── */}
+      {bestUp && (
+        <div className="insight" style={{ borderColor: S.green, marginTop: 8 }}>
+          <strong style={{ color: S.green }}>↑ Topo (${upperLimit.toFixed(0)}):</strong>{" "}
+          <strong style={{ color: S.gold }}>${bestUp.strike.toLocaleString()}</strong> — {bestUp.oddPct}% — $20 recebe{" "}
+          <strong style={{ color: S.green }}>${(20 / parseFloat(bestUp.odd)).toFixed(0)}</strong>
+          {bestDown && <>{" · "}
+            <strong style={{ color: S.red }}>↓ Fundo (${lowerLimit.toFixed(0)}):</strong>{" "}
+            <strong style={{ color: S.textDim }}>${bestDown.strike.toLocaleString()}</strong> — {bestDown.oddPct}% — $20 recebe{" "}
+            <strong style={{ color: S.textDim }}>${(20 / parseFloat(bestDown.odd)).toFixed(0)}</strong>
+          </>}
         </div>
       )}
     </div>
@@ -2216,7 +2201,7 @@ function TabMaintenance() {
         <div className="grid-5">
           <Field label="CAPITAL"   value={capital}  onChange={setCapital}  prefix="$" min={500}  max={50000} step={100} />
           <Field label="APR"       value={apr}      onChange={setApr}      suffix="%" min={10}   max={500}   step={5} />
-          <Field label="STOP %"    value={stopPct}  onChange={setStopPct}  suffix="%" min={0.5}  max={5}     step={0.1} />
+          <Field label="STOP %"    value={stopPct}  onChange={setStopPct}  suffix="%" min={0.5}  max={15}    step={0.1} />
           <Field label="SEMANAS"   value={weeks}    onChange={w => { setWeeks(w); setWeekData(Array.from({ length: 12 }, () => ({ oddOverride: null, extraBet: 0 }))); }} min={2} max={12} step={1} />
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
