@@ -167,8 +167,6 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
   const [downOdd, setDownOdd] = useState(0.02);
   const [downBet, setDownBet] = useState(5);
   const [alertSet, setAlertSet] = useState(false);
-  const [shortEth, setShortEth]   = useState(0);      // ETH qty shorted
-  const [fundingRate, setFundingRate] = useState(0.01); // funding % per day
 
   // Auto-fill ETH price when live data arrives
   useEffect(() => {
@@ -1041,11 +1039,17 @@ function MiniChart({ path, color, exitIdx, exitType }) {
   return <canvas ref={canvasRef} width={380} height={160} style={{ width: "100%", height: 160, borderRadius: 6 }} />;
 }
 
-function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr = 100, stopPct = 2, scenarioIdx = 0) {
-  const LOWER = 1800, UPPER = 2200;
+function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr = 100, stopPct = 2, scenarioIdx = 0,
+  shortEth = 0, ethPrice = 2000, rangeLo = 10, rangeHi = 10, fundingRate = 0.01, downOdd = 0.02, downBet = 5) {
+  const LOWER = ethPrice * (1 - rangeLo / 100);
+  const UPPER = ethPrice * (1 + rangeHi / 100);
   const feesDay = capital * (apr / 100) / 365;
   const stop = capital * stopPct / 100;
   const winPayoff = betAmount / betOdd;
+  const downPayoff = downBet / downOdd;
+  const fundingCostDay = shortEth * ethPrice * (fundingRate / 100);
+  const shortPnlUpper = -shortEth * (ethPrice * rangeHi / 100);
+  const shortPnlLower =  shortEth * (ethPrice * rangeLo / 100);
   let fees = 0, exitDay = null, exitType = null;
 
   for (let i = 0; i < path.length; i++) {
@@ -1060,10 +1064,15 @@ function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr =
 
   const weeksActive = Math.ceil((exitDay + 1) / 7);
   const totalBetCost = betAmount * weeksActive;
-  const betPayoff = exitType === "upper" ? winPayoff : 0;
+  const betPayoff  = exitType === "upper" ? winPayoff  : 0;
+  const downBetPayoff = exitType === "lower" ? downPayoff : 0;
+  const fundingCost = fundingCostDay * exitDay;
+  const shortPnl = exitType === "upper" ? shortPnlUpper
+                 : exitType === "lower" ? shortPnlLower
+                 : -fundingCost; // range: only funding cost
   const lpPnL = exitType === "still_in" ? fees : fees - stop;
-  let netPnL = lpPnL + betPayoff - totalBetCost;
-  let netWithout = lpPnL;
+  let netPnL = lpPnL + betPayoff + downBetPayoff + shortPnl - totalBetCost - downBet * weeksActive;
+  let netWithout = lpPnL + shortPnl;
   let extra = {};
 
   // Scenario 5: Early exit — sell bet at 55% of max payoff on day 5
@@ -1153,49 +1162,47 @@ function calcScenario(path, betOdd = 0.15, betAmount = 20, capital = 4000, apr =
     exitType = "still_in";
   }
 
-  return { fees, exitDay, exitType, weeksActive, totalBetCost, betPayoff, lpPnL, netPnL, netWithout, winPayoff, stop, extra };
+  const shortPnlFinal = exitType === 'upper' ? shortPnlUpper - fundingCost
+                       : exitType === 'lower' ? shortPnlLower - fundingCost
+                       : -fundingCost;
+  return { fees, exitDay, exitType, weeksActive, totalBetCost, betPayoff, lpPnL, netPnL, netWithout, winPayoff, stop, extra, shortPnl: shortPnlFinal };
 }
 
-function TabScenarios() {
-  const [betOdd, setBetOdd] = useState(0.15);
-  const [downOdd, setDownOdd] = useState(0.02);
-  const [downBet, setDownBet] = useState(5);
-  const [betAmount, setBetAmount] = useState(20);
-  const [capital, setCapital] = useState(4000);
-  const [apr, setApr] = useState(100);
-  const [stopPct, setStopPct] = useState(2);
-  const [rangeLo3, setRangeLo3] = useState(10);
-  const [rangeHi3, setRangeHi3] = useState(10);
+function TabScenarios({ simState, updateSim }) {
   const [activeIdx, setActiveIdx] = useState(null);
   const paths = useMemo(() => SCENARIO_META.map((_, i) => generatePath(i)), []);
-  const results = useMemo(() => paths.map((p, i) => calcScenario(p, betOdd, betAmount, capital, apr, stopPct, i)), [paths, betOdd, betAmount, capital, apr, stopPct]);
+  const { betOdd, betAmount, capital, apr, stopPct, shortEth, ethPrice, rangeLo, rangeHi, fundingRate, downOdd, downBet } = simState;
+  const results = useMemo(() => paths.map((p, i) => calcScenario(p, betOdd, betAmount, capital, apr, stopPct, i, shortEth, ethPrice, rangeLo, rangeHi, fundingRate, downOdd, downBet)), [paths, betOdd, betAmount, capital, apr, stopPct, shortEth, ethPrice, rangeLo, rangeHi, fundingRate, downOdd, downBet]);
   const DAY_LABELS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Qui","Sex","Sáb","Dom","Seg","Ter","Qua","Dom"];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Controls */}
-      <div className="card">
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: "inherit", marginBottom: 14 }}>PARÂMETROS GLOBAIS</div>
-        <div className="grid-5">
-          <Field label="CAPITAL" value={capital} onChange={setCapital} prefix="$" min={500} max={100000} step={100} />
-          <Field label="APR" value={apr} onChange={setApr} suffix="%" min={10} max={500} step={5} />
-          <Field label="STOP %" value={stopPct} onChange={setStopPct} suffix="%" min={0.5} max={15} step={0.1} />
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">ODD APOSTA</span>
-              <span style={{ color: S.gold, fontSize: 13, fontFamily: "'IBM Plex Mono'" }}>{(betOdd*100).toFixed(0)}%</span>
+      {/* Synced params summary */}
+      <div className="card" style={{ borderColor: S.gold + "30" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "1px", fontFamily: "'IBM Plex Mono',monospace", color: S.gold, marginBottom: 12 }}>
+          PARÂMETROS DA SIMULAÇÃO — sincronizados com aba Polymarket Hedge
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+          {[
+            { label: "CAPITAL",    val: `$${capital.toLocaleString()}` },
+            { label: "APR",        val: `${apr}%` },
+            { label: "STOP",       val: `${stopPct}% ($${(capital*stopPct/100).toFixed(0)})` },
+            { label: "RANGE",      val: `-${rangeLo}% / +${rangeHi}%` },
+            { label: "ODD ↑",      val: `${(betOdd*100).toFixed(0)}% → ${(1/betOdd).toFixed(0)}x` },
+            { label: "APOSTA ↑",   val: `$${betAmount}/sem` },
+            { label: "ODD ↓",      val: `${(downOdd*100).toFixed(1)}% → ${(1/downOdd).toFixed(0)}x` },
+            { label: "APOSTA ↓",   val: `$${downBet}/sem` },
+            { label: "SHORT",      val: shortEth > 0 ? `${shortEth} ETH ($${(shortEth*ethPrice).toFixed(0)})` : "sem short" },
+            { label: "FUNDING",    val: shortEth > 0 ? `${fundingRate}%/dia` : "—" },
+          ].map(({ label, val }) => (
+            <div key={label}>
+              <div style={{ fontSize: 9, color: S.dim, fontFamily: "'IBM Plex Mono'", letterSpacing: 1 }}>{label}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: S.text, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>{val}</div>
             </div>
-            <input type="range" min={3} max={50} step={1}
-              value={Math.round(betOdd*100)}
-              onChange={e => setBetOdd(+e.target.value/100)} />
-          </div>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span className="label">APOSTA/SEM</span>
-              <span style={{ color: S.gold, fontSize: 12, fontFamily: "'IBM Plex Mono'" }}>${betAmount}</span>
-            </div>
-            <input type="range" min={5} max={80} step={5} value={betAmount} onChange={e => setBetAmount(+e.target.value)} />
-          </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: S.dim, fontFamily: "'Inter'", marginTop: 10 }}>
+          💡 Para alterar os parâmetros, volte para a aba <strong style={{ color: S.gold }}>Polymarket Hedge</strong>
         </div>
       </div>
 
@@ -1224,11 +1231,12 @@ function TabScenarios() {
 
               <MiniChart path={paths[idx]} color={sc.color} exitIdx={r.exitDay} exitType={r.exitType} />
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginTop: 10 }}>
                 {[
                   { label: "DIAS", value: `${r.exitDay}d` },
                   { label: "FEES", value: `+$${r.fees.toFixed(0)}`, c: S.green },
-                  { label: `APOSTAS×${r.weeksActive}`, value: `-$${r.totalBetCost}`, c: S.red },
+                  { label: "APOSTAS", value: `-$${r.totalBetCost + downBet * r.weeksActive}`, c: S.red },
+                  { label: "SHORT", value: shortEth > 0 ? `${r.shortPnl >= 0 ? "+" : ""}$${r.shortPnl.toFixed(0)}` : "—", c: shortEth > 0 ? col(r.shortPnl) : S.dim },
                   { label: "SEM HEDGE", value: `${r.netWithout >= 0 ? "+" : ""}$${r.netWithout.toFixed(0)}`, c: col(r.netWithout) },
                 ].map(item => (
                   <div key={item.label} style={{ textAlign: "center", background: "#090914", borderRadius: 6, padding: "6px 4px" }}>
@@ -1989,8 +1997,16 @@ export default function App() {
   const [ethChange24h, setEthChange24h] = useState(null);
   const [ethLoading, setEthLoading] = useState(false);
 
-  // ── Alert state: {active, plo, phi, capital} ──
+  // ── Alert state ──
   const [alert, setAlert] = useState(null);
+
+  // ── Shared simulation state (synced between tabs) ──
+  const [simState, setSimState] = useState({
+    ethPrice: 2000, capital: 4000, rangeLo: 10, rangeHi: 10,
+    apr: 100, stopPct: 2, betOdd: 0.15, betAmount: 20,
+    downOdd: 0.02, downBet: 5, shortEth: 0, fundingRate: 0.01,
+  });
+  const updateSim = (key, val) => setSimState(s => ({ ...s, [key]: val }));
 
   const fetchEthPrice = async () => {
     setEthLoading(true);
@@ -2115,8 +2131,8 @@ export default function App() {
 
       {/* Content */}
       <div style={{ padding: "0 clamp(8px, 3vw, 28px) 40px", maxWidth: 960, margin: "0 auto" }}>
-        {tab === 0 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} />}
-        {tab === 1 && <TabScenarios />}
+        {tab === 0 && <TabPolymarket liveEth={liveEth} onSetAlert={setAlert} requestAlertPermission={requestAlertPermission} simState={simState} updateSim={updateSim} />}
+        {tab === 1 && <TabScenarios simState={simState} updateSim={updateSim} />}
         {tab === 2 && <TabMaintenance />}
       </div>
     </div>
