@@ -175,6 +175,7 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission, simState =
   const setShortEth    = v => updateSim('shortEth', v);
   const setFundingRate = v => updateSim('fundingRate', v);
   const [alertSet, setAlertSet] = useState(false);
+  const [weeklyEndDate, setWeeklyEndDate] = useState(null);
   const [entryDay, setEntryDay] = useState(0);
   const [waitDays, setWaitDays] = useState(0);
   const [ethMoveWait, setEthMoveWait] = useState(0);
@@ -259,10 +260,9 @@ function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission, simState =
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-      {/* Countdown to next market open */}
-      <WeeklyCountdown />
+      <WeeklyCountdown endDate={weeklyEndDate} />
 
-      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} onSelectDownOdd={odd => setDownOdd(odd)} />
+      <PolymarketLive ethPrice={ethPrice} rangePct={rangeHi} onSelectOdd={odd => setBetOdd(odd)} onSelectDownOdd={odd => setDownOdd(odd)} onWeeklyMarketLoaded={d => setWeeklyEndDate(d)} />
 
       {/* Early entry panels — side by side */}
       <div className="grid-2">
@@ -1641,28 +1641,29 @@ function EarlyEntryPanel({ ethPrice, betOdd, setBetOdd }) {
 // ═══════════════════════════════════════════════════════════════
 // WEEKLY COUNTDOWN COMPONENT
 // ═══════════════════════════════════════════════════════════════
-function WeeklyCountdown() {
+function WeeklyCountdown({ endDate }) {
   const [timeLeft, setTimeLeft] = useState(null);
   const [phase, setPhase]       = useState(""); // "open_soon" | "open_now" | "midweek" | "closing"
 
   useEffect(() => {
     function calc() {
-      // Market opens Monday 00:00 UTC = Sunday 21:00 Brasília (UTC-3)
-      // Market closes Sunday 04:00 UTC = Saturday 01:00 Brasília
       const now = new Date();
       const nowUTC = new Date(now.toISOString());
-      const day = nowUTC.getUTCDay(); // 0=Sun 1=Mon ... 6=Sat
+      const day = nowUTC.getUTCDay();
       const h   = nowUTC.getUTCHours();
-      const m   = nowUTC.getUTCMinutes();
-      const s   = nowUTC.getUTCSeconds();
-      const totalSecsToday = h * 3600 + m * 60 + s;
+      const totalSecsToday = h * 3600 + nowUTC.getUTCMinutes() * 60 + nowUTC.getUTCSeconds();
 
-      // Next Monday 00:00 UTC
-      let daysToMon = (8 - day) % 7;
-      if (daysToMon === 0 && totalSecsToday > 3600) daysToMon = 7; // already past open
-      if (day === 1 && totalSecsToday < 21600) daysToMon = 0; // still Monday early
-
-      const secsTilOpen = daysToMon * 86400 - totalSecsToday;
+      // Use real endDate from API if available, else fall back to next Monday 00:00 UTC
+      let secsTilOpen;
+      if (endDate) {
+        const target = new Date(endDate);
+        secsTilOpen = Math.round((target - now) / 1000);
+      } else {
+        let daysToMon = (8 - day) % 7;
+        if (daysToMon === 0 && totalSecsToday > 3600) daysToMon = 7;
+        if (day === 1 && totalSecsToday < 21600) daysToMon = 0;
+        secsTilOpen = daysToMon * 86400 - totalSecsToday;
+      }
 
       // Phases
       if (day === 1 && h < 3) {
@@ -1741,7 +1742,7 @@ function WeeklyCountdown() {
             </div>
           )}
           <div style={{ fontSize: 10, color: S.dim, fontFamily: "'IBM Plex Mono'", marginTop: 4, textAlign: "right" }}>
-            Segunda 00:00 UTC · Dom 21h Brasília
+            horário via Polymarket · Dom 21h Brasília (UTC-3)
           </div>
         </div>
       </div>
@@ -1829,7 +1830,7 @@ function AlertSetup({ ethPrice, plo, phi, capital, onSetAlert, requestAlertPermi
 // ═══════════════════════════════════════════════════════════════
 // POLYMARKET LIVE PANEL
 // ═══════════════════════════════════════════════════════════════
-function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
+function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd, onWeeklyMarketLoaded }) {
   const [markets, setMarkets]       = useState([]);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState(null);
@@ -1849,6 +1850,9 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
       if (data.success && data.markets.length > 0) {
         setMarkets(data.markets);
         setLastUpdate(new Date().toLocaleTimeString("pt-BR"));
+        // Pass endDate of weekly market (shortest duration = first) to parent
+        const wm = data.markets.find(m => /\d+-\d+/.test(m.question)) || data.markets[0];
+        if (wm?.endDate && onWeeklyMarketLoaded) onWeeklyMarketLoaded(wm.endDate);
       } else {
         setError("Nenhum mercado ETH encontrado agora.");
       }
