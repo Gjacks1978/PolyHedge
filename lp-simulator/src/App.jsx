@@ -156,26 +156,33 @@ function CollapsibleCard({ title, titleColor, borderColor, defaultOpen = true, c
 // ═══════════════════════════════════════════════════════════════
 // TAB 2 — POLYMARKET HEDGE
 // ═══════════════════════════════════════════════════════════════
-function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission }) {
-  const [ethPrice, setEthPrice] = useState(2000);
-  const [capital, setCapital] = useState(4000);
-  const [rangeLo, setRangeLo] = useState(10);
-  const [rangeHi, setRangeHi] = useState(10);
-  const [apr, setApr] = useState(100);
-  const [stopPct, setStopPct] = useState(2);
-  const [betOdd, setBetOdd] = useState(0.15);
-  const [downOdd, setDownOdd] = useState(0.02);
-  const [downBet, setDownBet] = useState(5);
+function TabPolymarket({ liveEth, onSetAlert, requestAlertPermission, simState = {}, updateSim = () => {} }) {
+  const {
+    ethPrice = 2000, capital = 4000, rangeLo = 10, rangeHi = 10,
+    apr = 100, stopPct = 2, betOdd = 0.15, betAmount = 20,
+    downOdd = 0.02, downBet = 5, shortEth = 0, fundingRate = 0.01,
+  } = simState;
+  const setEthPrice    = v => updateSim('ethPrice', v);
+  const setCapital     = v => updateSim('capital', v);
+  const setRangeLo     = v => updateSim('rangeLo', v);
+  const setRangeHi     = v => updateSim('rangeHi', v);
+  const setApr         = v => updateSim('apr', v);
+  const setStopPct     = v => updateSim('stopPct', v);
+  const setBetOdd      = v => updateSim('betOdd', v);
+  const setBetAmount   = v => updateSim('betAmount', v);
+  const setDownOdd     = v => updateSim('downOdd', v);
+  const setDownBet     = v => updateSim('downBet', v);
+  const setShortEth    = v => updateSim('shortEth', v);
+  const setFundingRate = v => updateSim('fundingRate', v);
   const [alertSet, setAlertSet] = useState(false);
-
-  // Auto-fill ETH price when live data arrives
-  useEffect(() => {
-    if (liveEth && !alertSet) setEthPrice(Math.round(liveEth));
-  }, [liveEth]);
-  const [betAmount, setBetAmount] = useState(20);
   const [entryDay, setEntryDay] = useState(0);
   const [waitDays, setWaitDays] = useState(0);
   const [ethMoveWait, setEthMoveWait] = useState(0);
+
+  // Auto-fill ETH price when live data arrives
+  useEffect(() => {
+    if (liveEth && !alertSet) updateSim('ethPrice', Math.round(liveEth));
+  }, [liveEth]);
 
   const Plo = ethPrice * (1 - rangeLo / 100);
   const Phi = ethPrice * (1 + rangeHi / 100);
