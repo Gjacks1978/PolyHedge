@@ -35,7 +35,7 @@ export default async function handler(req, res) {
         
         // First price is "Yes" probability
         const odd = parseFloat(prices[0] || 0);
-        if (odd <= 0.005 || odd >= 0.995) continue;
+        if (odd <= 0.0005 || odd >= 0.9995) continue; // include <1% strikes
 
         // Extract strike number
         const priceMatch = q.replace(/,/g, "").match(/[\d]+/);
@@ -56,17 +56,16 @@ export default async function handler(req, res) {
         });
       }
 
-      const upOutcomes = outcomes
-        .filter(o => o.isUp)
-        .sort((a, b) => a.strike - b.strike);
+      const allOutcomes = outcomes
+        .sort((a, b) => b.strike - a.strike); // highest strike first
 
-      if (upOutcomes.length > 0) {
+      if (allOutcomes.length > 0) {
         result.push({
           id: event.id,
           question: event.title,
           endDate: event.endDate,
           volume: event.volume,
-          outcomes: upOutcomes,
+          outcomes: allOutcomes,
         });
       }
     }
