@@ -1830,11 +1830,13 @@ function AlertSetup({ ethPrice, plo, phi, capital, onSetAlert, requestAlertPermi
 // POLYMARKET LIVE PANEL
 // ═══════════════════════════════════════════════════════════════
 function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
-  const [markets, setMarkets]     = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState(null);
+  const [markets, setMarkets]       = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const [expanded, setExpanded]   = useState(false);
+  const [expanded, setExpanded]     = useState(false);
+  const [selectedUp, setSelectedUp]     = useState(null); // strike selecionado upside
+  const [selectedDown, setSelectedDown] = useState(null); // strike selecionado downside
 
   const upperLimit = ethPrice * (1 + rangePct / 100);
   const lowerLimit = ethPrice * (1 - rangePct / 100);
@@ -1872,11 +1874,23 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
   // Best upside/downside from weekly market — no strike filter, show all
   const weeklyOutcomes = weeklyMarket?.outcomes || [];
   const bestUp = weeklyOutcomes
-    .filter(o => o.strike >= upperLimit * 0.95)
+    .filter(o => o.isUp && o.strike >= upperLimit * 0.90)
     .sort((a, b) => Math.abs(a.strike - upperLimit) - Math.abs(b.strike - upperLimit))[0];
   const bestDown = weeklyOutcomes
-    .filter(o => o.strike <= lowerLimit * 1.05)
+    .filter(o => !o.isUp && o.strike <= lowerLimit * 1.10)
     .sort((a, b) => Math.abs(a.strike - lowerLimit) - Math.abs(b.strike - lowerLimit))[0];
+
+  const handleSelect = (o) => {
+    // Use isUp flag; fallback: strikes >= ethPrice são upside
+    const goingUp = o.isUp !== undefined ? o.isUp : (o.strike >= ethPrice);
+    if (goingUp) {
+      setSelectedUp(o.strike);
+      if (onSelectOdd) onSelectOdd(parseFloat(o.odd));
+    } else {
+      setSelectedDown(o.strike);
+      if (onSelectDownOdd) onSelectDownOdd(parseFloat(o.odd));
+    }
+  };
 
   const renderMarket = (market, hideTitle = false) => {
     return (
@@ -1890,30 +1904,44 @@ function PolymarketLive({ ethPrice, rangePct, onSelectOdd, onSelectDownOdd }) {
         </div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {(market.outcomes || []).map((o, i) => {
-            const isUp   = bestUp   && o.strike === bestUp.strike   && market === weeklyMarket;
-            const isDown = bestDown && o.strike === bestDown.strike && market === weeklyMarket;
+            const goingUp    = o.isUp !== undefined ? o.isUp : (o.strike >= ethPrice);
+            const isBestUp   = bestUp   && o.strike === bestUp.strike   && market === weeklyMarket && goingUp;
+            const isBestDown = bestDown && o.strike === bestDown.strike && market === weeklyMarket && !goingUp;
+            const isSelUp    = goingUp  && o.strike === selectedUp;
+            const isSelDown  = !goingUp && o.strike === selectedDown;
+            const isSelected = isSelUp || isSelDown;
+            const borderColor = isSelected
+              ? (goingUp ? S.green : S.red)
+              : isBestUp ? S.green + "80"
+              : isBestDown ? S.red + "50"
+              : S.border;
+            const bg = isSelected
+              ? (goingUp ? S.green + "25" : S.red + "20")
+              : isBestUp ? S.green + "10"
+              : isBestDown ? S.red + "10"
+              : "#090914";
             return (
               <div key={i}
-                onClick={() => { if (onSelectOdd) onSelectOdd(parseFloat(o.odd)); }}
+                onClick={() => handleSelect(o)}
                 style={{ padding: "8px 12px", borderRadius: 8, minWidth: 90, textAlign: "center",
-                  background: isUp ? S.green + "20" : isDown ? S.red + "15" : "#090914",
-                  border: "1px solid " + (isUp ? S.green : isDown ? S.red + "60" : S.border),
+                  background: bg, border: "2px solid " + borderColor,
                   cursor: "pointer", transition: "all 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = S.gold}
-                onMouseLeave={e => e.currentTarget.style.borderColor = isUp ? S.green : isDown ? S.red + "60" : S.border}>
-                <div style={{ fontSize: 10, color: isUp ? S.green : isDown ? S.red : S.dim,
-                  fontFamily: "'IBM Plex Mono'", marginBottom: 3 }}>
-                  {isUp ? "★ " : isDown ? "▼ " : ""}${o.strike.toLocaleString()}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = S.gold; e.currentTarget.style.background = S.gold + "15"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.background = bg; }}>
+                <div style={{ fontSize: 10, fontFamily: "'IBM Plex Mono'", marginBottom: 3,
+                  color: isSelUp ? S.green : isSelDown ? S.red : isBestUp ? S.green : isBestDown ? S.red : S.dim }}>
+                  {isBestUp ? "★ " : isBestDown ? "▼ " : ""}{goingUp ? "↑" : "↓"} ${o.strike.toLocaleString()}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700,
-                  color: isUp ? S.green : isDown ? S.red : S.text, fontFamily: "'Space Grotesk'" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Space Grotesk'",
+                  color: isSelUp ? S.green : isSelDown ? S.red : S.text }}>
                   {o.oddPct}%
                 </div>
                 <div style={{ fontSize: 10, color: S.textDim, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>
                   paga ${o.payoffPer100}/$100
                 </div>
-                <div style={{ fontSize: 9, color: S.gold, fontFamily: "'IBM Plex Mono'", marginTop: 3 }}>
-                  ↑ usar
+                <div style={{ fontSize: 9, fontFamily: "'IBM Plex Mono'", marginTop: 3,
+                  color: goingUp ? S.green : S.red }}>
+                  {goingUp ? "↑ usar upside" : "↓ usar downside"}
                 </div>
               </div>
             );
